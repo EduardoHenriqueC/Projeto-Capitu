@@ -1,0 +1,2698 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portal Capitu | Central de Conhecimento CS Estante Virtual</title>
+    <!-- Google Fonts: Plus Jakarta Sans & JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap"
+        rel="stylesheet">
+
+    <style>
+        :root {
+            /* Identidade Visual Oficial Estante Virtual & Projeto Capitu */
+            --ev-teal-dark: #004D4C;
+            /* Verde Escuro / Fundo Principal da Marca */
+            --ev-teal-primary: #006968;
+            /* Verde Teal Oficial / Header e Hero */
+            --ev-teal-light: #008785;
+            /* Teal Médio */
+            --ev-turquoise: #32BCA3;
+            /* Turquesa Ciano Oficial / Botões de Ação e Destaques */
+            --ev-turquoise-hover: #29a891;
+            /* Turquesa Hover */
+            --ev-turquoise-light: rgba(50, 188, 163, 0.12);
+            /* Fundo sutil Turquesa */
+            --ev-purple: #9C27B0;
+            /* Roxo Vibrante / Destaques, Tags e Badges */
+            --ev-purple-dark: #7B1FA2;
+            /* Roxo Escuro */
+            --ev-purple-light: rgba(156, 39, 176, 0.12);
+            /* Fundo sutil Roxo */
+            --ev-amber: #FF9800;
+            /* Alerta / Avisos Operacionais */
+            --ev-amber-light: #FFF8E1;
+            /* Fundo de Aviso */
+            --ev-red: #E53935;
+            /* Crítico / Erro */
+            --ev-red-light: #FFEBEE;
+
+            /* Neutros e Tipografia */
+            --bg-body: #F4F6F8;
+            /* Cinza muito claro de fundo */
+            --bg-surface: #FFFFFF;
+            /* Cartões e superfícies */
+            --bg-surface-hover: #FAFCFC;
+            --text-dark: #1E293B;
+            /* Texto escuro principal */
+            --text-muted: #526071;
+            /* Texto secundário e legendas */
+            --text-light: #FFFFFF;
+            /* Texto claro para header */
+            --border-subtle: #E2E8F0;
+            /* Bordas delicadas */
+            --border-focus: #32BCA3;
+            /* Borda de foco */
+
+            /* Efeitos & Elevações */
+            --shadow-xs: 0 1px 2px rgba(0, 77, 76, 0.04);
+            --shadow-sm: 0 2px 8px rgba(0, 77, 76, 0.06);
+            --shadow-md: 0 8px 24px rgba(0, 77, 76, 0.08);
+            --shadow-lg: 0 16px 36px rgba(0, 77, 76, 0.14);
+            --radius-sm: 8px;
+            --radius-md: 14px;
+            --radius-lg: 20px;
+            --radius-pill: 9999px;
+
+            --transition-fast: 0.18s ease;
+            --transition-normal: 0.28s ease;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-body);
+            color: var(--text-dark);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ========================================================
+           HEADER PRINCIPAL (Navbar Unificada do Hub)
+           ======================================================== */
+        .hub-navbar {
+            background-color: #FFFFFF;
+            border-bottom: 1px solid var(--border-subtle);
+            padding: 12px 36px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            box-shadow: var(--shadow-xs);
+        }
+
+        .brand-container {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            cursor: pointer;
+            text-decoration: none;
+        }
+
+        .brand-badge {
+            background: linear-gradient(135deg, var(--ev-teal-dark) 0%, var(--ev-teal-primary) 100%);
+            color: #FFFFFF;
+            font-size: 1.15rem;
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 8px rgba(0, 77, 76, 0.2);
+        }
+
+        .brand-text-col {
+            line-height: 1.15;
+        }
+
+        .brand-eyebrow {
+            font-size: 0.68rem;
+            font-weight: 800;
+            letter-spacing: 1.2px;
+            text-transform: uppercase;
+            color: var(--ev-teal-primary);
+        }
+
+        .brand-name {
+            font-size: 1.25rem;
+            font-weight: 800;
+            color: var(--ev-teal-dark);
+            letter-spacing: -0.4px;
+        }
+
+        .brand-name span {
+            color: var(--ev-turquoise);
+        }
+
+        /* Menu de Navegação Horizontal */
+        .hub-nav-menu {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            list-style: none;
+        }
+
+        .nav-link-btn {
+            background: transparent;
+            border: none;
+            padding: 9px 16px;
+            border-radius: var(--radius-pill);
+            font-size: 0.88rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .nav-link-btn:hover {
+            color: var(--ev-teal-primary);
+            background-color: #F1F5F9;
+        }
+
+        .nav-link-btn.active {
+            color: #FFFFFF;
+            background-color: var(--ev-teal-primary);
+            box-shadow: 0 2px 8px rgba(0, 105, 104, 0.25);
+        }
+
+        /* Lado direito do Header */
+        .navbar-actions {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .btn-leader-access {
+            background-color: #FFFFFF;
+            border: 1px solid var(--border-subtle);
+            color: var(--ev-teal-primary);
+            padding: 8px 14px;
+            border-radius: var(--radius-pill);
+            font-size: 0.82rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-leader-access:hover {
+            border-color: var(--ev-purple);
+            color: var(--ev-purple);
+            background: var(--ev-purple-light);
+        }
+
+        .btn-leader-access.logged-in {
+            background-color: var(--ev-purple-light);
+            border-color: var(--ev-purple);
+            color: var(--ev-purple-dark);
+        }
+
+        .user-chip {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding-left: 10px;
+            border-left: 1px solid var(--border-subtle);
+        }
+
+        .avatar-circle {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, var(--ev-teal-primary) 0%, var(--ev-turquoise) 100%);
+            color: #FFFFFF;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 0.84rem;
+        }
+
+        .user-caption {
+            font-size: 0.82rem;
+            font-weight: 700;
+            color: var(--text-dark);
+            line-height: 1.2;
+        }
+
+        .user-caption span {
+            display: block;
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        /* ========================================================
+           CONTEÚDO GERAL E VIEWS (Telas que alternam)
+           ======================================================== */
+        .app-view-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .view-section {
+            display: none;
+            animation: fadeInView 0.24s ease-out;
+        }
+
+        .view-section.active-view {
+            display: block;
+        }
+
+        @keyframes fadeInView {
+            from {
+                opacity: 0;
+                transform: translateY(6px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* ========================================================
+           VIEW 1: PÁGINA INICIAL (DASHBOARD HUB DE SUPORTE)
+           ======================================================== */
+        /* Hero Central: "Qual a leitura de hoje?" */
+        .hero-hub {
+            background: linear-gradient(135deg, var(--ev-teal-dark) 0%, var(--ev-teal-primary) 65%, #017B79 100%);
+            color: #FFFFFF;
+            padding: 56px 24px 72px 24px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0, 77, 76, 0.12);
+        }
+
+        .hero-hub::before {
+            content: '';
+            position: absolute;
+            top: -50px;
+            right: 10%;
+            width: 320px;
+            height: 320px;
+            background: radial-gradient(circle, rgba(50, 188, 163, 0.25) 0%, transparent 70%);
+            border-radius: 50%;
+            pointer-events: none;
+        }
+
+        .hero-hub::after {
+            content: '';
+            position: absolute;
+            bottom: -60px;
+            left: 15%;
+            width: 300px;
+            height: 300px;
+            background: radial-gradient(circle, rgba(156, 39, 176, 0.15) 0%, transparent 65%);
+            border-radius: 50%;
+            pointer-events: none;
+        }
+
+        .hero-hub-inner {
+            max-width: 820px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 2;
+        }
+
+        .hero-hub-tag {
+            background-color: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(8px);
+            padding: 5px 14px;
+            border-radius: var(--radius-pill);
+            font-size: 0.74rem;
+            font-weight: 700;
+            letter-spacing: 1.2px;
+            text-transform: uppercase;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .hero-hub-title {
+            font-size: 2.7rem;
+            font-weight: 800;
+            letter-spacing: -0.8px;
+            line-height: 1.15;
+            margin-bottom: 14px;
+            color: #FFFFFF;
+        }
+
+        .hero-hub-title span {
+            color: var(--ev-turquoise);
+        }
+
+        .hero-hub-subtitle {
+            font-size: 1.05rem;
+            color: rgba(255, 255, 255, 0.88);
+            line-height: 1.6;
+            margin-bottom: 32px;
+            font-weight: 400;
+        }
+
+        /* Barra de Busca Grande Central do Hero */
+        .hero-search-box {
+            max-width: 660px;
+            margin: 0 auto;
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .hero-search-icon {
+            position: absolute;
+            left: 20px;
+            color: var(--ev-teal-primary);
+            font-size: 1.25rem;
+            pointer-events: none;
+        }
+
+        .hero-search-input {
+            width: 100%;
+            padding: 16px 120px 16px 54px;
+            border-radius: var(--radius-pill);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            font-size: 1.02rem;
+            font-weight: 500;
+            outline: none;
+            background-color: #FFFFFF;
+            color: var(--text-dark);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.16);
+            transition: all var(--transition-fast);
+        }
+
+        .hero-search-input:focus {
+            border-color: var(--ev-turquoise);
+            box-shadow: 0 10px 35px rgba(50, 188, 163, 0.35);
+        }
+
+        .hero-search-btn {
+            position: absolute;
+            right: 8px;
+            background: var(--ev-teal-primary);
+            color: #FFFFFF;
+            border: none;
+            padding: 10px 22px;
+            border-radius: var(--radius-pill);
+            font-size: 0.88rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background var(--transition-fast);
+        }
+
+        .hero-search-btn:hover {
+            background: var(--ev-turquoise-hover);
+        }
+
+        /* Container Central dos Boxes e Conteúdo da Home */
+        .hub-content-container {
+            max-width: 1200px;
+            margin: -36px auto 60px auto;
+            padding: 0 24px;
+            width: 100%;
+            position: relative;
+            z-index: 10;
+        }
+
+        /* ========================================================
+           BOXES DE ACESSO RÁPIDO CENTRAIS (Design Minimalista EV)
+           ======================================================== */
+        .boxes-grid-central {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 22px;
+            margin-bottom: 40px;
+        }
+
+        .central-box {
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            padding: 30px 24px 26px 24px;
+            box-shadow: var(--shadow-sm);
+            cursor: pointer;
+            transition: all var(--transition-normal);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            position: relative;
+            overflow: hidden;
+            text-align: left;
+        }
+
+        .central-box::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: transparent;
+            transition: background var(--transition-fast);
+        }
+
+        .central-box:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--shadow-md);
+            border-color: rgba(50, 188, 163, 0.35);
+        }
+
+        .central-box:hover::before {
+            background: linear-gradient(90deg, var(--ev-teal-primary) 0%, var(--ev-turquoise) 100%);
+        }
+
+        .box-icon-wrapper {
+            width: 58px;
+            height: 58px;
+            border-radius: 16px;
+            background-color: var(--ev-turquoise-light);
+            color: var(--ev-teal-primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.7rem;
+            margin-bottom: 20px;
+            transition: transform var(--transition-fast);
+        }
+
+        .central-box:hover .box-icon-wrapper {
+            transform: scale(1.06);
+        }
+
+        .central-box.box-teal .box-icon-wrapper {
+            background-color: rgba(0, 105, 104, 0.1);
+            color: var(--ev-teal-primary);
+        }
+
+        .central-box.box-purple .box-icon-wrapper {
+            background-color: var(--ev-purple-light);
+            color: var(--ev-purple);
+        }
+
+        .central-box-title {
+            font-size: 1.22rem;
+            font-weight: 800;
+            color: var(--ev-teal-dark);
+            margin-bottom: 8px;
+            letter-spacing: -0.3px;
+        }
+
+        .central-box-desc {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            line-height: 1.55;
+            margin-bottom: 22px;
+        }
+
+        .central-box-action {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--ev-teal-primary);
+            transition: gap var(--transition-fast);
+        }
+
+        .central-box:hover .central-box-action {
+            color: var(--ev-turquoise);
+            gap: 10px;
+        }
+
+        /* ========================================================
+           MURAL DE AVISOS & GESTÃO DA LIDERANÇA
+           ======================================================== */
+        .mural-wrapper {
+            background-color: var(--bg-surface);
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--border-subtle);
+            box-shadow: var(--shadow-sm);
+            padding: 30px 34px;
+            margin-bottom: 40px;
+        }
+
+        .mural-top-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 22px;
+            flex-wrap: wrap;
+            gap: 14px;
+        }
+
+        .mural-title-group {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .mural-heading {
+            font-size: 1.28rem;
+            font-weight: 800;
+            color: var(--ev-teal-dark);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .mural-badge {
+            background-color: #FEF3C7;
+            color: #92400E;
+            font-size: 0.72rem;
+            font-weight: 800;
+            padding: 4px 10px;
+            border-radius: var(--radius-pill);
+            text-transform: uppercase;
+        }
+
+        .btn-leader-trigger {
+            background-color: transparent;
+            border: 1px dashed var(--border-subtle);
+            color: var(--text-muted);
+            padding: 7px 14px;
+            border-radius: var(--radius-pill);
+            font-size: 0.8rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-leader-trigger:hover {
+            border-color: var(--ev-purple);
+            color: var(--ev-purple);
+            background-color: var(--ev-purple-light);
+        }
+
+        /* PAINEL DO LÍDER (Exibido apenas quando autenticado como líder) */
+        .leader-publish-panel {
+            display: none;
+            /* Controlado via JS */
+            background: linear-gradient(135deg, rgba(156, 39, 176, 0.05) 0%, rgba(50, 188, 163, 0.05) 100%);
+            border: 2px dashed var(--ev-purple);
+            border-radius: var(--radius-md);
+            padding: 22px 24px;
+            margin-bottom: 24px;
+            animation: fadeInBody 0.25s ease-out;
+        }
+
+        .leader-panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .leader-status-tag {
+            background-color: var(--ev-purple);
+            color: #FFFFFF;
+            font-size: 0.76rem;
+            font-weight: 800;
+            padding: 4px 12px;
+            border-radius: var(--radius-pill);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-logout-leader {
+            background: transparent;
+            border: 1px solid #CBD5E1;
+            color: var(--text-muted);
+            font-size: 0.76rem;
+            font-weight: 700;
+            padding: 4px 10px;
+            border-radius: var(--radius-pill);
+            cursor: pointer;
+        }
+
+        .btn-logout-leader:hover {
+            background-color: #F1F5F9;
+            color: var(--ev-red);
+            border-color: var(--ev-red);
+        }
+
+        .form-row {
+            margin-bottom: 14px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: var(--ev-teal-dark);
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .input-title {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-sm);
+            font-size: 0.94rem;
+            font-weight: 600;
+            outline: none;
+            background-color: #FFFFFF;
+            transition: border-color var(--transition-fast);
+        }
+
+        .input-title:focus {
+            border-color: var(--ev-purple);
+        }
+
+        .textarea-message {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-sm);
+            font-size: 0.92rem;
+            line-height: 1.5;
+            min-height: 90px;
+            outline: none;
+            background-color: #FFFFFF;
+            resize: vertical;
+            transition: border-color var(--transition-fast);
+        }
+
+        .textarea-message:focus {
+            border-color: var(--ev-purple);
+        }
+
+        .btn-publish-notice {
+            background-color: var(--ev-purple);
+            color: #FFFFFF;
+            border: none;
+            padding: 10px 22px;
+            border-radius: var(--radius-pill);
+            font-size: 0.88rem;
+            font-weight: 800;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 2px 10px rgba(156, 39, 176, 0.3);
+        }
+
+        .btn-publish-notice:hover {
+            background-color: var(--ev-purple-dark);
+            transform: translateY(-1px);
+        }
+
+        /* Lista de Avisos no Mural */
+        .notices-list {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .notice-card {
+            background: #FFFFFF;
+            border-left: 5px solid var(--ev-amber);
+            border-radius: var(--radius-sm);
+            padding: 18px 20px;
+            border-top: 1px solid var(--border-subtle);
+            border-right: 1px solid var(--border-subtle);
+            border-bottom: 1px solid var(--border-subtle);
+            box-shadow: var(--shadow-xs);
+            display: flex;
+            align-items: flex-start;
+            gap: 16px;
+        }
+
+        .notice-card.urgent {
+            border-left-color: var(--ev-red);
+        }
+
+        .notice-card.leader-notice {
+            border-left-color: var(--ev-purple);
+        }
+
+        .notice-icon-box {
+            width: 36px;
+            height: 36px;
+            background-color: var(--ev-amber-light);
+            color: #D97706;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.15rem;
+            flex-shrink: 0;
+        }
+
+        .notice-card.leader-notice .notice-icon-box {
+            background-color: var(--ev-purple-light);
+            color: var(--ev-purple);
+        }
+
+        .notice-content {
+            flex: 1;
+        }
+
+        .notice-meta {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 4px;
+            flex-wrap: wrap;
+        }
+
+        .notice-title {
+            font-size: 0.98rem;
+            font-weight: 800;
+            color: var(--ev-teal-dark);
+        }
+
+        .notice-time {
+            font-size: 0.76rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .notice-desc {
+            font-size: 0.9rem;
+            color: var(--text-dark);
+            line-height: 1.55;
+        }
+
+        /* ========================================================
+           VIEW 2: ABA REGULAMENTOS E BASE DE CONHECIMENTO
+           ======================================================== */
+        .page-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 32px 24px 60px 24px;
+            width: 100%;
+        }
+
+        .knowledge-section {
+            background-color: var(--bg-surface);
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--border-subtle);
+            box-shadow: var(--shadow-sm);
+            overflow: hidden;
+            margin-bottom: 40px;
+        }
+
+        .knowledge-header-bar {
+            padding: 26px 32px;
+            background: linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .breadcrumb-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.82rem;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+            font-weight: 500;
+        }
+
+        .breadcrumb-row a {
+            color: var(--ev-teal-primary);
+            text-decoration: none;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .breadcrumb-row a:hover {
+            text-decoration: underline;
+        }
+
+        .knowledge-title-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .knowledge-title {
+            font-size: 1.45rem;
+            font-weight: 800;
+            color: var(--ev-teal-dark);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .knowledge-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn-toggle-all {
+            background-color: #FFFFFF;
+            border: 1px solid var(--border-subtle);
+            color: var(--text-muted);
+            padding: 8px 14px;
+            border-radius: var(--radius-sm);
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-toggle-all:hover {
+            background-color: #F1F5F9;
+            color: var(--ev-teal-dark);
+            border-color: #CBD5E1;
+        }
+
+        /* Filtro de Categorias de Regulamentos */
+        .filter-tags-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 14px 32px;
+            background-color: #FAFBFD;
+            border-bottom: 1px solid var(--border-subtle);
+            overflow-x: auto;
+        }
+
+        .filter-label {
+            font-size: 0.76rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            margin-right: 6px;
+            white-space: nowrap;
+        }
+
+        .filter-tag-pill {
+            background-color: #FFFFFF;
+            border: 1px solid var(--border-subtle);
+            color: var(--text-muted);
+            font-size: 0.78rem;
+            font-weight: 600;
+            padding: 5px 12px;
+            border-radius: var(--radius-pill);
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            white-space: nowrap;
+        }
+
+        .filter-tag-pill:hover,
+        .filter-tag-pill.active {
+            background-color: var(--ev-teal-primary);
+            color: #FFFFFF;
+            border-color: var(--ev-teal-primary);
+        }
+
+        /* Container dos Acordeões */
+        .accordions-container {
+            padding: 28px 32px 36px 32px;
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+
+        details.regulation-accordion {
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            background-color: #FFFFFF;
+            overflow: hidden;
+            transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+        }
+
+        details.regulation-accordion:hover {
+            border-color: #CBD5E1;
+            box-shadow: var(--shadow-sm);
+        }
+
+        details.regulation-accordion[open] {
+            border-color: rgba(0, 105, 104, 0.4);
+            box-shadow: 0 4px 16px rgba(0, 105, 104, 0.08);
+        }
+
+        summary.accordion-summary {
+            padding: 18px 24px;
+            background: #FFFFFF;
+            font-weight: 700;
+            cursor: pointer;
+            list-style: none;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            user-select: none;
+            transition: background var(--transition-fast);
+        }
+
+        summary.accordion-summary::-webkit-details-marker {
+            display: none;
+        }
+
+        details.regulation-accordion[open] summary.accordion-summary {
+            background: linear-gradient(90deg, rgba(0, 105, 104, 0.04) 0%, #FFFFFF 100%);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .summary-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .accordion-num {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            background: var(--ev-teal-primary);
+            color: #FFFFFF;
+            font-size: 0.85rem;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        details.regulation-accordion:nth-child(2) .accordion-num {
+            background: var(--ev-turquoise);
+        }
+
+        details.regulation-accordion:nth-child(3) .accordion-num {
+            background: var(--ev-purple);
+        }
+
+        details.regulation-accordion:nth-child(4) .accordion-num {
+            background: var(--ev-teal-dark);
+        }
+
+        details.regulation-accordion:nth-child(5) .accordion-num {
+            background: #007A78;
+        }
+
+        .summary-title-text {
+            font-size: 1.05rem;
+            color: var(--ev-teal-dark);
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .summary-tag {
+            font-size: 0.68rem;
+            font-weight: 700;
+            padding: 3px 8px;
+            border-radius: var(--radius-pill);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .tag-turquoise {
+            background-color: var(--ev-turquoise-light);
+            color: #007A78;
+        }
+
+        .tag-purple {
+            background-color: var(--ev-purple-light);
+            color: var(--ev-purple-dark);
+        }
+
+        .summary-right {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .accordion-badge {
+            font-size: 0.74rem;
+            color: var(--text-muted);
+            font-weight: 600;
+            background: #F1F5F9;
+            padding: 4px 10px;
+            border-radius: var(--radius-pill);
+        }
+
+        .accordion-chevron {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: #F1F5F9;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--ev-teal-primary);
+            font-size: 0.85rem;
+            transition: transform var(--transition-normal), background var(--transition-fast);
+        }
+
+        details.regulation-accordion[open] .accordion-chevron {
+            transform: rotate(180deg);
+            background: var(--ev-teal-primary);
+            color: #FFFFFF;
+        }
+
+        .accordion-body {
+            padding: 26px 28px;
+            background-color: #FFFFFF;
+            line-height: 1.65;
+            color: var(--text-dark);
+            animation: fadeInBody 0.25s ease-out;
+        }
+
+        @keyframes fadeInBody {
+            from {
+                opacity: 0;
+                transform: translateY(-4px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 16px;
+            margin: 18px 0;
+        }
+
+        .info-card {
+            background-color: #F8FAFC;
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-sm);
+            padding: 16px 18px;
+            position: relative;
+        }
+
+        .info-card.highlight-teal {
+            border-left: 4px solid var(--ev-turquoise);
+            background: linear-gradient(135deg, rgba(50, 188, 163, 0.05) 0%, #F8FAFC 100%);
+        }
+
+        .info-card.highlight-purple {
+            border-left: 4px solid var(--ev-purple);
+            background: linear-gradient(135deg, rgba(156, 39, 176, 0.05) 0%, #F8FAFC 100%);
+        }
+
+        .info-card.highlight-dark {
+            border-left: 4px solid var(--ev-teal-dark);
+        }
+
+        .info-card-title {
+            font-size: 0.84rem;
+            font-weight: 700;
+            color: var(--ev-teal-dark);
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+
+        .info-card-text {
+            font-size: 0.92rem;
+            color: var(--text-dark);
+        }
+
+        .status-pipeline {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #F1F5F9;
+            padding: 14px 18px;
+            border-radius: var(--radius-md);
+            margin: 16px 0;
+            overflow-x: auto;
+            gap: 8px;
+        }
+
+        .pipeline-step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            min-width: 95px;
+        }
+
+        .step-pill {
+            padding: 6px 12px;
+            border-radius: var(--radius-pill);
+            font-size: 0.76rem;
+            font-weight: 700;
+            background-color: #FFFFFF;
+            color: var(--ev-teal-dark);
+            border: 1px solid #CBD5E1;
+            box-shadow: var(--shadow-xs);
+            margin-bottom: 4px;
+            white-space: nowrap;
+        }
+
+        .pipeline-step.step-highlight .step-pill {
+            background-color: var(--ev-teal-primary);
+            color: #FFFFFF;
+            border-color: var(--ev-teal-primary);
+        }
+
+        .pipeline-step.step-standby .step-pill {
+            background-color: #FEF3C7;
+            color: #92400E;
+            border-color: #FCD34D;
+        }
+
+        .step-subtext {
+            font-size: 0.68rem;
+            color: #64748B;
+            font-weight: 600;
+        }
+
+        .pipeline-arrow {
+            color: #94A3B8;
+            font-size: 0.9rem;
+            font-weight: 800;
+        }
+
+        .callout-box {
+            background-color: #F8FAFC;
+            border-radius: var(--radius-sm);
+            padding: 16px 20px;
+            margin: 16px 0;
+            border-left: 4px solid var(--ev-teal-primary);
+            display: flex;
+            align-items: flex-start;
+            gap: 14px;
+        }
+
+        .callout-box.danger {
+            background-color: var(--ev-red-light);
+            border-left-color: var(--ev-red);
+            color: #991B1B;
+        }
+
+        .callout-box.purple {
+            background-color: var(--ev-purple-light);
+            border-left-color: var(--ev-purple);
+            color: var(--ev-purple-dark);
+        }
+
+        .callout-box.warning {
+            background-color: var(--ev-amber-light);
+            border-left-color: var(--ev-amber);
+            color: #92400E;
+        }
+
+        .callout-icon {
+            font-size: 1.25rem;
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+
+        .callout-content {
+            font-size: 0.9rem;
+            line-height: 1.55;
+        }
+
+        .callout-content strong {
+            display: block;
+            margin-bottom: 3px;
+            font-size: 0.92rem;
+        }
+
+        .custom-bullet-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin: 12px 0;
+        }
+
+        .custom-bullet-list li {
+            position: relative;
+            padding-left: 26px;
+            font-size: 0.92rem;
+            color: var(--text-dark);
+        }
+
+        .custom-bullet-list li::before {
+            content: '✓';
+            position: absolute;
+            left: 0;
+            top: 1px;
+            width: 18px;
+            height: 18px;
+            background-color: var(--ev-turquoise-light);
+            color: #007A78;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.72rem;
+            font-weight: 800;
+        }
+
+        .step-sequence {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin: 14px 0;
+            background: #F8FAFC;
+            padding: 12px 18px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border-subtle);
+        }
+
+        .seq-step {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--ev-teal-dark);
+        }
+
+        .seq-arrow {
+            color: #94A3B8;
+            font-weight: 800;
+        }
+
+        .btn-copy-macro {
+            background: #FFFFFF;
+            border: 1px solid var(--border-subtle);
+            color: var(--ev-teal-primary);
+            padding: 6px 12px;
+            border-radius: var(--radius-sm);
+            font-size: 0.78rem;
+            font-weight: 700;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 10px;
+            transition: all var(--transition-fast);
+        }
+
+        .btn-copy-macro:hover {
+            border-color: var(--ev-turquoise);
+            color: var(--ev-turquoise);
+            background: var(--ev-turquoise-light);
+        }
+
+        /* ========================================================
+           VIEW 3: HUB DE MACROS (EM CONSTRUÇÃO / EMPTY STATE)
+           ======================================================== */
+        .empty-state-card {
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-lg);
+            padding: 70px 30px;
+            text-align: center;
+            max-width: 760px;
+            margin: 40px auto;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .empty-state-icon {
+            width: 90px;
+            height: 90px;
+            border-radius: 28px;
+            background-color: var(--ev-purple-light);
+            color: var(--ev-purple);
+            font-size: 2.8rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 24px auto;
+            box-shadow: 0 4px 16px rgba(156, 39, 176, 0.15);
+        }
+
+        .empty-state-badge {
+            background-color: #EDE9FE;
+            color: #6D28D9;
+            font-size: 0.76rem;
+            font-weight: 800;
+            padding: 4px 12px;
+            border-radius: var(--radius-pill);
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            display: inline-block;
+            margin-bottom: 12px;
+        }
+
+        .empty-state-title {
+            font-size: 1.65rem;
+            font-weight: 800;
+            color: var(--ev-teal-dark);
+            margin-bottom: 12px;
+        }
+
+        .empty-state-desc {
+            font-size: 1rem;
+            color: var(--text-muted);
+            line-height: 1.6;
+            max-width: 520px;
+            margin: 0 auto 28px auto;
+        }
+
+        .empty-state-features {
+            background-color: #F8FAFC;
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            padding: 18px 24px;
+            text-align: left;
+            max-width: 480px;
+            margin: 0 auto 28px auto;
+        }
+
+        .empty-features-title {
+            font-size: 0.82rem;
+            font-weight: 700;
+            color: var(--ev-teal-dark);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+
+        .empty-features-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            font-size: 0.88rem;
+            color: var(--text-muted);
+        }
+
+        .btn-back-home {
+            background-color: var(--ev-teal-primary);
+            color: #FFFFFF;
+            border: none;
+            padding: 12px 26px;
+            border-radius: var(--radius-pill);
+            font-size: 0.92rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-back-home:hover {
+            background-color: var(--ev-turquoise-hover);
+        }
+
+        /* ========================================================
+           VIEW 4 & 5: MANUAL OPERACIONAL & ATENDIMENTO TÉCNICO
+           ======================================================== */
+        .simple-content-card {
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-lg);
+            padding: 36px 40px;
+            box-shadow: var(--shadow-sm);
+            margin-bottom: 40px;
+        }
+
+        /* ========================================================
+           MODAL DE AUTENTICAÇÃO DO LÍDER (Gestão CS)
+           ======================================================== */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 30, 30, 0.6);
+            backdrop-filter: blur(4px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            padding: 20px;
+        }
+
+        .modal-overlay.show {
+            display: flex;
+            animation: fadeInBody 0.2s ease-out;
+        }
+
+        .modal-card {
+            background-color: #FFFFFF;
+            border-radius: var(--radius-lg);
+            width: 100%;
+            max-width: 440px;
+            padding: 32px;
+            box-shadow: var(--shadow-lg);
+            border: 1px solid var(--border-subtle);
+            position: relative;
+        }
+
+        .modal-close-btn {
+            position: absolute;
+            top: 18px;
+            right: 18px;
+            background: transparent;
+            border: none;
+            font-size: 1.2rem;
+            color: var(--text-muted);
+            cursor: pointer;
+        }
+
+        .modal-icon-badge {
+            width: 48px;
+            height: 48px;
+            border-radius: 14px;
+            background-color: var(--ev-purple-light);
+            color: var(--ev-purple);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.4rem;
+            margin-bottom: 16px;
+        }
+
+        .modal-title {
+            font-size: 1.25rem;
+            font-weight: 800;
+            color: var(--ev-teal-dark);
+            margin-bottom: 6px;
+        }
+
+        .modal-desc {
+            font-size: 0.88rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+            margin-bottom: 20px;
+        }
+
+        .modal-input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-sm);
+            font-size: 0.94rem;
+            outline: none;
+            margin-bottom: 8px;
+            transition: border-color var(--transition-fast);
+        }
+
+        .modal-input:focus {
+            border-color: var(--ev-purple);
+            box-shadow: 0 0 0 3px rgba(156, 39, 176, 0.15);
+        }
+
+        .modal-error-msg {
+            color: var(--ev-red);
+            font-size: 0.78rem;
+            font-weight: 600;
+            margin-bottom: 14px;
+            display: none;
+        }
+
+        .btn-modal-submit {
+            width: 100%;
+            background-color: var(--ev-purple);
+            color: #FFFFFF;
+            border: none;
+            padding: 12px;
+            border-radius: var(--radius-pill);
+            font-size: 0.92rem;
+            font-weight: 800;
+            cursor: pointer;
+            transition: background var(--transition-fast);
+        }
+
+        .btn-modal-submit:hover {
+            background-color: var(--ev-purple-dark);
+        }
+
+        /* Notificação Toast Flutuante */
+        .toast-notification {
+            position: fixed;
+            bottom: 24px;
+            right: 28px;
+            background: var(--ev-teal-dark);
+            color: #FFFFFF;
+            padding: 12px 20px;
+            border-radius: var(--radius-pill);
+            font-size: 0.86rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: var(--shadow-lg);
+            z-index: 120;
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            border: 1px solid var(--ev-turquoise);
+        }
+
+        .toast-notification.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        /* ========================================================
+           RESPONSIVIDADE
+           ======================================================== */
+        @media (max-width: 900px) {
+            .hub-navbar {
+                padding: 12px 18px;
+                flex-wrap: wrap;
+                gap: 12px;
+            }
+
+            .hub-nav-menu {
+                order: 3;
+                width: 100%;
+                overflow-x: auto;
+                padding-bottom: 4px;
+            }
+
+            .hero-hub-title {
+                font-size: 2.1rem;
+            }
+
+            .hero-search-box {
+                width: 100%;
+            }
+        }
+
+        @media (max-width: 600px) {
+            .hero-hub {
+                padding: 40px 18px 60px 18px;
+            }
+
+            .hero-hub-title {
+                font-size: 1.75rem;
+            }
+
+            .boxes-grid-central {
+                grid-template-columns: 1fr;
+            }
+
+            .mural-wrapper {
+                padding: 20px 18px;
+            }
+
+            .knowledge-header-bar,
+            .accordions-container {
+                padding: 18px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- ========================================================
+         HEADER / NAVBAR UNIFICADA (Estilo Central de Ajuda EV)
+         ======================================================== -->
+    <header class="hub-navbar">
+        <!-- Brand / Logo -->
+        <a class="brand-container" onclick="switchView('home')">
+            <div class="brand-badge">📚</div>
+            <div class="brand-text-col">
+                <div class="brand-eyebrow">Estante Virtual</div>
+                <div class="brand-name">Portal <span>Capitu</span></div>
+            </div>
+        </a>
+
+        <!-- Menu de Navegação Superior (Substitui a antiga sidebar fixa) -->
+        <nav>
+            <ul class="hub-nav-menu" id="hubNavMenu">
+                <li>
+                    <button class="nav-link-btn active" data-target="home" onclick="switchView('home')">
+                        <span>🏠</span> Início
+                    </button>
+                </li>
+                <li>
+                    <button class="nav-link-btn" data-target="regulamentos" onclick="switchView('regulamentos')">
+                        <span>📜</span> Regulamentos
+                    </button>
+                </li>
+                <li>
+                    <button class="nav-link-btn" data-target="macros" onclick="switchView('macros')">
+                        <span>💬</span> Hub de Macros
+                    </button>
+                </li>
+                <li>
+                    <button class="nav-link-btn" data-target="manual" onclick="switchView('manual')">
+                        <span>📖</span> Manuais
+                    </button>
+                </li>
+                <li>
+                    <button class="nav-link-btn" data-target="tecnico" onclick="switchView('tecnico')">
+                        <span>🛠️</span> Técnico
+                    </button>
+                </li>
+            </ul>
+        </nav>
+
+        <!-- Ações do Header (Acesso Líder & Perfil) -->
+        <div class="navbar-actions">
+            <!-- Botão de Acesso do Líder -->
+            <button class="btn-leader-access" id="btnLeaderHeader" onclick="handleLeaderAuthButtonClick()">
+                <span id="leaderBtnIcon">🔐</span>
+                <span id="leaderBtnText">Acesso Líder</span>
+            </button>
+
+            <!-- Perfil do Analista -->
+            <div class="user-chip">
+                <div class="avatar-circle">CS</div>
+                <div class="user-caption">
+                    Equipe CS
+                    <span>Estante Virtual</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- ========================================================
+         CONTAINER PRINCIPAL COM AS TELAS (VIEWS)
+         ======================================================== -->
+    <div class="app-view-container">
+
+        <!-- ========================================================
+             VIEW 1: PÁGINA INICIAL (DASHBOARD HUB CENTRAL)
+             ======================================================== -->
+        <section id="viewHome" class="view-section active-view">
+            <!-- HERO COM A PERGUNTA CENTRAL SOLICITADA -->
+            <div class="hero-hub">
+                <div class="hero-hub-inner">
+                    <div class="hero-hub-tag">Portal Central de Conhecimento • Atendimento CS</div>
+                    <h1 class="hero-hub-title">Qual a leitura <span>de hoje?</span></h1>
+                    <p class="hero-hub-subtitle">
+                        Encontre rapidamente regras operacionais, manuais de atendimento e regulamentos oficiais da
+                        Estante Virtual.
+                    </p>
+
+                    <!-- Barra de Busca Central em Pílula -->
+                    <div class="hero-search-box">
+                        <span class="hero-search-icon">🔍</span>
+                        <input type="text" id="heroSearchInput" class="hero-search-input"
+                            placeholder="Digite uma dúvida, erro, regra de frete, devolução ou PIX...">
+                        <button class="hero-search-btn" onclick="executeHubSearch()">Buscar</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CONTAINER CENTRAL: BOXES & MURAL DE AVISOS -->
+            <div class="hub-content-container">
+
+                <!-- BOXES DE ACESSO RÁPIDO CENTRAIS (Design Minimalista EV) -->
+                <div class="boxes-grid-central">
+                    <!-- Box 1: Meus Pedidos & Rastreio -->
+                    <div class="central-box box-teal" onclick="navigateToRegulationTopic('pedidos')">
+                        <div>
+                            <div class="box-icon-wrapper">📦</div>
+                            <h3 class="central-box-title">Meus Pedidos & Rastreio</h3>
+                            <p class="central-box-desc">
+                                Ciclo de vida dos pedidos, status oficiais (Stand by, Aguardando Envio) e
+                                particularidades do Frete Econômico nos Correios.
+                            </p>
+                        </div>
+                        <div class="central-box-action">
+                            <span>Acessar procedimentos de rastreio</span>
+                            <span>→</span>
+                        </div>
+                    </div>
+
+                    <!-- Box 2: Manuais de Atendimento -->
+                    <div class="central-box box-teal" onclick="switchView('manual')">
+                        <div>
+                            <div class="box-icon-wrapper">📖</div>
+                            <h3 class="central-box-title">Manuais de Atendimento</h3>
+                            <p class="central-box-desc">
+                                Guias operacionais passo a passo, critérios da Compra Garantida, boas práticas de
+                                resolução no primeiro contato (FCR).
+                            </p>
+                        </div>
+                        <div class="central-box-action">
+                            <span>Consultar manuais operacionais</span>
+                            <span>→</span>
+                        </div>
+                    </div>
+
+                    <!-- Box 3: Regulamentos -->
+                    <div class="central-box box-purple" onclick="switchView('regulamentos')">
+                        <div>
+                            <div class="box-icon-wrapper">📜</div>
+                            <h3 class="central-box-title">Regulamentos</h3>
+                            <p class="central-box-desc">
+                                Políticas oficiais consolidadas: prazos de envio pelo vendedor, devoluções CDC (7 dias),
+                                normas de estorno Pix e limites de carrinho.
+                            </p>
+                        </div>
+                        <div class="central-box-action">
+                            <span style="color: var(--ev-purple-dark);">Ver todos os 5 regulamentos</span>
+                            <span>→</span>
+                        </div>
+                    </div>
+
+                    <!-- Box 4: Problemas Técnicos -->
+                    <div class="central-box box-teal" onclick="switchView('tecnico')">
+                        <div>
+                            <div class="box-icon-wrapper">🛠️</div>
+                            <h3 class="central-box-title">Problemas Técnicos</h3>
+                            <p class="central-box-desc">
+                                Checklists de contingência operacional, instabilidades de gateway, fluxo de abertura de
+                                chamados para Engenharia.
+                            </p>
+                        </div>
+                        <div class="central-box-action">
+                            <span>Ver diagnósticos técnicos</span>
+                            <span>→</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- MURAL DE AVISOS OPERACIONAIS & PAINEL DO LÍDER -->
+                <div class="mural-wrapper">
+                    <div class="mural-top-row">
+                        <div class="mural-title-group">
+                            <h2 class="mural-heading">📢 Mural de Avisos Operacionais</h2>
+                            <span class="mural-badge">Tempo Real</span>
+                        </div>
+
+                        <button class="btn-leader-trigger" id="btnLeaderPanelTrigger" onclick="openLeaderLoginModal()">
+                            <span>🔐</span> Publicar Comunicado (Acesso Líder)
+                        </button>
+                    </div>
+
+                    <!-- FORMULÁRIO DE PUBLICAÇÃO DO LÍDER (Exibido estritamente quando logado) -->
+                    <div class="leader-publish-panel" id="leaderPublishPanel">
+                        <div class="leader-panel-header">
+                            <span class="leader-status-tag">
+                                <span>🛡️</span> Líder Autenticado (lider.cs@estantevirtual.com.br)
+                            </span>
+                            <button class="btn-logout-leader" onclick="logoutLeader()">Encerrar Sessão de Líder</button>
+                        </div>
+
+                        <div class="form-row">
+                            <label class="form-label" for="noticeTitleInput">Título do Comunicado:</label>
+                            <input type="text" id="noticeTitleInput" class="input-title"
+                                placeholder="Ex: Instabilidade normalizada no checkout...">
+                        </div>
+
+                        <div class="form-row">
+                            <label class="form-label" for="noticeMessageInput">Mensagem Operacional para os
+                                Analistas:</label>
+                            <textarea id="noticeMessageInput" class="textarea-message"
+                                placeholder="Escreva as instruções, macros recomendadas e orientações operacionais..."></textarea>
+                        </div>
+
+                        <button class="btn-publish-notice" onclick="publishNoticeByLeader()">
+                            <span>📢</span> Publicar Comunicado no Mural
+                        </button>
+                    </div>
+
+                    <!-- Lista de Comunicados do Mural -->
+                    <div class="notices-list" id="noticesList">
+                        <!-- Comunicado Padrão Operacional -->
+                        <div class="notice-card" id="defaultNoticeCard">
+                            <div class="notice-icon-box">⚠️</div>
+                            <div class="notice-content">
+                                <div class="notice-meta">
+                                    <span class="notice-title">Normalização: Gateway de Pagamentos PIX</span>
+                                    <span class="notice-time">Publicado hoje às 09:00 • Supervisão CS</span>
+                                </div>
+                                <div class="notice-desc">
+                                    A oscilação temporária no processamento de pagamentos via PIX foi <b>completamente
+                                        solucionada</b> pelo gateway parceiro. Todos os pedidos anteriormente retidos já
+                                    foram liberados para separação pelos livreiros. Não há necessidade de abertura de
+                                    incidentes de TI. Utilize a <b>Macro #43</b> para prestar esclarecimentos rápidos
+                                    aos clientes.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- ========================================================
+             VIEW 2: ABA REGULAMENTOS E BASE DE CONHECIMENTO
+             ======================================================== -->
+        <section id="viewRegulamentos" class="view-section">
+            <div class="page-container">
+                <div class="knowledge-section">
+
+                    <!-- Barra de Controle do Conhecimento -->
+                    <div class="knowledge-header-bar">
+                        <div class="breadcrumb-row">
+                            <a onclick="switchView('home')">Início (Hub)</a>
+                            <span>/</span>
+                            <a onclick="switchView('regulamentos')">Base de Conhecimento</a>
+                            <span>/</span>
+                            <strong>Regulamentos Oficiais</strong>
+                        </div>
+
+                        <div class="knowledge-title-row">
+                            <h2 class="knowledge-title">
+                                📜 Regulamentos e Base de Conhecimento
+                            </h2>
+
+                            <div class="knowledge-actions">
+                                <button class="btn-toggle-all" onclick="toggleAllAccordions(true)">
+                                    ➕ Expandir Todos
+                                </button>
+                                <button class="btn-toggle-all" onclick="toggleAllAccordions(false)">
+                                    ➖ Recolher Todos
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Filtros Rápidos por Tag -->
+                    <div class="filter-tags-row">
+                        <span class="filter-label">Filtrar Tópicos:</span>
+                        <button class="filter-tag-pill active" onclick="filterCategory('all', this)">Todos (5)</button>
+                        <button class="filter-tag-pill" onclick="filterCategory('pedidos', this)">📦 Acompanhamento &
+                            Status</button>
+                        <button class="filter-tag-pill" onclick="filterCategory('envio', this)">⏱️ Prazos &
+                            Vendedor</button>
+                        <button class="filter-tag-pill" onclick="filterCategory('trocas', this)">🔄 Trocas &
+                            Cancelamento</button>
+                        <button class="filter-tag-pill" onclick="filterCategory('pagamento', this)">💳 Reembolsos &
+                            Pix</button>
+                        <button class="filter-tag-pill" onclick="filterCategory('carrinho', this)">🛒 Carrinho &
+                            Busca</button>
+                    </div>
+
+                    <!-- OS 5 ACORDEÕES OFICIAIS COM CONTEÚDO INTEGRAL -->
+                    <div class="accordions-container" id="accordionsList">
+
+                        <!-- ACORDEÃO 1: ACOMPANHAMENTO E STATUS DE PEDIDOS -->
+                        <details class="regulation-accordion" data-category="pedidos" open>
+                            <summary class="accordion-summary">
+                                <div class="summary-left">
+                                    <span class="accordion-num">01</span>
+                                    <div>
+                                        <div class="summary-title-text">
+                                            Acompanhamento e Status de Pedidos
+                                            <span class="summary-tag tag-turquoise">Rastreio & Fluxos</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="summary-right">
+                                    <span class="accordion-badge">3 tópicos</span>
+                                    <span class="accordion-chevron">▼</span>
+                                </div>
+                            </summary>
+
+                            <div class="accordion-body">
+                                <div class="info-card highlight-teal">
+                                    <div class="info-card-title">🔍 Como o Cliente Deve Acompanhar o Pedido</div>
+                                    <div class="info-card-text">
+                                        O cliente deve acessar o site oficial da Estante Virtual, realizar o login com
+                                        suas credenciais e clicar na seção <strong>"Meus pedidos"</strong> no topo da
+                                        página. Lá estarão listadas todas as compras ativas e históricas.
+                                    </div>
+                                </div>
+
+                                <h4
+                                    style="font-size: 0.94rem; color: var(--ev-teal-dark); margin: 18px 0 8px 0; font-weight: 700;">
+                                    📊 Ciclo de Vida do Pedido (Fluxos de Status Oficiais):
+                                </h4>
+                                <div class="status-pipeline">
+                                    <div class="pipeline-step">
+                                        <div class="step-pill">Processando</div>
+                                        <span class="step-subtext">Validação de pgto</span>
+                                    </div>
+                                    <span class="pipeline-arrow">➔</span>
+                                    <div class="pipeline-step step-standby">
+                                        <div class="step-pill">Stand by</div>
+                                        <span class="step-subtext">Até 48h úteis</span>
+                                    </div>
+                                    <span class="pipeline-arrow">➔</span>
+                                    <div class="pipeline-step">
+                                        <div class="step-pill">Aguardando Envio</div>
+                                        <span class="step-subtext">Livreiro separando</span>
+                                    </div>
+                                    <span class="pipeline-arrow">➔</span>
+                                    <div class="pipeline-step step-highlight">
+                                        <div class="step-pill">Enviado</div>
+                                        <span class="step-subtext">Em trânsito</span>
+                                    </div>
+                                    <span class="pipeline-arrow">➔</span>
+                                    <div class="pipeline-step">
+                                        <div class="step-pill">Recebido</div>
+                                        <span class="step-subtext">Entrega finalizada</span>
+                                    </div>
+                                </div>
+
+                                <div class="callout-box warning">
+                                    <div class="callout-icon">💡</div>
+                                    <div class="callout-content">
+                                        <strong>Atenção para Dúvidas de Rastreio - Frete Econômico:</strong>
+                                        Na modalidade de <b>Frete Econômico</b>, o rastreamento nos Correios é
+                                        <b>simplificado</b> (não exibe o trajeto detalhado passo a passo). O sistema dos
+                                        Correios atualiza apenas duas etapas: a <b>postagem pelo vendedor</b> e a
+                                        <b>saída para entrega ao destinatário</b>. Tranquilize o cliente informando que
+                                        a ausência de atualizações intermediárias é o comportamento padrão desta
+                                        categoria de envio.
+                                    </div>
+                                </div>
+
+                                <button class="btn-copy-macro"
+                                    onclick="copyMacroDirect('Para acompanhar seu pedido, basta fazer login na Estante Virtual e acessar a aba \'Meus pedidos\'. Na modalidade de Frete Econômico, o rastreio dos Correios é simplificado, exibindo apenas o momento da postagem e da entrega.')">
+                                    📋 Copiar Resposta Padrão de Rastreio
+                                </button>
+                            </div>
+                        </details>
+
+                        <!-- ACORDEÃO 2: PRAZOS E ENVIO PELO VENDEDOR -->
+                        <details class="regulation-accordion" data-category="envio" open>
+                            <summary class="accordion-summary">
+                                <div class="summary-left">
+                                    <span class="accordion-num">02</span>
+                                    <div>
+                                        <div class="summary-title-text">
+                                            Prazos e Envio pelo Vendedor
+                                            <span class="summary-tag tag-purple">SLA de Postagem</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="summary-right">
+                                    <span class="accordion-badge">SLA & Endereço</span>
+                                    <span class="accordion-chevron">▼</span>
+                                </div>
+                            </summary>
+
+                            <div class="accordion-body">
+                                <div class="info-grid">
+                                    <div class="info-card highlight-purple">
+                                        <div class="info-card-title">⏳ Prazo Oficial de Envio pelo Livreiro</div>
+                                        <div class="info-card-text">
+                                            O vendedor parceiro possui o prazo de <strong>até 2 dias úteis</strong> após
+                                            a confirmação do pagamento para realizar a postagem do exemplar e anexar o
+                                            código de rastreamento no painel.
+                                        </div>
+                                    </div>
+
+                                    <div class="info-card highlight-teal">
+                                        <div class="info-card-title">📮 Atraso na Postagem (Fluxo de Mediação)</div>
+                                        <div class="info-card-text">
+                                            Caso o prazo de 2 dias úteis seja ultrapassado, orientar o cliente a seguir
+                                            o fluxo oficial:
+                                            <div class="step-sequence" style="margin-top: 8px; padding: 8px 12px;">
+                                                <span class="seq-step">Minhas compras</span>
+                                                <span class="seq-arrow">➔</span>
+                                                <span class="seq-step">Demora na Postagem</span>
+                                            </div>
+                                            Após esse acionamento, o <b>vendedor tem até 2 dias úteis para responder</b>
+                                            ou regularizar o envio.
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="callout-box danger">
+                                    <div class="callout-icon">🛑</div>
+                                    <div class="callout-content">
+                                        <strong>Regra Crítica: Alteração de Endereço de Entrega:</strong>
+                                        <b>Não é possível alterar a forma de envio nem o endereço de entrega após a
+                                            conclusão do pedido no site</b>. O cliente deve <b>contatar o vendedor
+                                            imediatamente</b> através do chat do pedido para solicitar a atualização do
+                                        endereço antes da etiqueta ser emitida e despachada.
+                                    </div>
+                                </div>
+
+                                <button class="btn-copy-macro"
+                                    onclick="copyMacroDirect('O vendedor tem até 2 dias úteis após a confirmação do pagamento para postar seu pedido. Não é possível alterar o endereço pelo sistema após a conclusão, por isso solicitamos que entre em contato direto com o vendedor pelo painel de compras o mais rápido possível.')">
+                                    📋 Copiar Procedimento de Postagem & Endereço
+                                </button>
+                            </div>
+                        </details>
+
+                        <!-- ACORDEÃO 3: TROCAS, DEVOLUÇÕES E CANCELAMENTO -->
+                        <details class="regulation-accordion" data-category="trocas" open>
+                            <summary class="accordion-summary">
+                                <div class="summary-left">
+                                    <span class="accordion-num">03</span>
+                                    <div>
+                                        <div class="summary-title-text">
+                                            Trocas, Devoluções e Cancelamento
+                                            <span class="summary-tag tag-turquoise">CDC & Logística Reversa</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="summary-right">
+                                    <span class="accordion-badge">CDC Art. 49</span>
+                                    <span class="accordion-chevron">▼</span>
+                                </div>
+                            </summary>
+
+                            <div class="accordion-body">
+                                <div class="info-card highlight-teal" style="margin-bottom: 18px;">
+                                    <div class="info-card-title">📅 Prazo Legal de Solicitação</div>
+                                    <div class="info-card-text">
+                                        O leitor tem até <strong>7 dias corridos</strong> a partir da data de
+                                        recebimento do livro para solicitar troca, devolução ou cancelamento com base no
+                                        Código de Defesa do Consumidor e nas normas da Estante Virtual.
+                                    </div>
+                                </div>
+
+                                <h4
+                                    style="font-size: 0.94rem; color: var(--ev-teal-dark); margin-bottom: 8px; font-weight: 700;">
+                                    📋 Motivos Válidos Aceitos para Abertura de Chamado:
+                                </h4>
+                                <ul class="custom-bullet-list">
+                                    <li>
+                                        <strong>Desacordo com a descrição:</strong> O exemplar entregue diverge dos
+                                        detalhes informados no anúncio (edição diferente, folhas faltantes, grifos não
+                                        sinalizados ou conservação inferior).
+                                    </li>
+                                    <li>
+                                        <strong>Avaria no transporte:</strong> Livro danificado, molhado ou amassado
+                                        comprovadamente durante a logística de entrega.
+                                    </li>
+                                    <li>
+                                        <strong>Arrependimento de compra:</strong> Direito de reflexão do comprador
+                                        dentro do prazo regulamentar de 7 dias corridos após o recebimento.
+                                    </li>
+                                </ul>
+
+                                <div class="callout-box purple" style="margin-top: 20px;">
+                                    <div class="callout-icon">📦</div>
+                                    <div class="callout-content">
+                                        <strong>Diretrizes Oficiais de Envio da Devolução:</strong>
+                                        <ul style="margin-left: 18px; margin-top: 6px; line-height: 1.6;">
+                                            <li>O exemplar deve ser postado nos Correios como <strong>"Impresso normal"
+                                                    com registro módico</strong>.</li>
+                                            <li>É <b>obrigatório incluir Seguro</b> para livros cujo valor seja <b>acima
+                                                    de R$ 50,00</b>.</li>
+                                            <li><strong>Reembolso do Frete:</strong> O valor do frete de devolução é
+                                                <b>reembolsado integralmente pelo vendedor</b> em caso de
+                                                cancelamento/devolução confirmada.</li>
+                                        </ul>
+                                    </div>
+                                </div>
+
+                                <button class="btn-copy-macro"
+                                    onclick="copyMacroDirect('Você tem até 7 dias corridos após o recebimento para solicitar devolução (por desacordo com a descrição, avaria ou arrependimento). A postagem de retorno deve ser feita como Impresso Normal com Registro Módico (com seguro obrigatório para livros acima de R$ 50,00). O valor do frete de devolução é reembolsado pelo vendedor.')">
+                                    📋 Copiar Macro de Logística Reversa
+                                </button>
+                            </div>
+                        </details>
+
+                        <!-- ACORDEÃO 4: PAGAMENTOS, REEMBOLSOS E CPF -->
+                        <details class="regulation-accordion" data-category="pagamento" open>
+                            <summary class="accordion-summary">
+                                <div class="summary-left">
+                                    <span class="accordion-num">04</span>
+                                    <div>
+                                        <div class="summary-title-text">
+                                            Pagamentos, Reembolsos e CPF
+                                            <span class="summary-tag tag-purple">Compliance Financeiro</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="summary-right">
+                                    <span class="accordion-badge">Normas de Titularidade</span>
+                                    <span class="accordion-chevron">▼</span>
+                                </div>
+                            </summary>
+
+                            <div class="accordion-body">
+                                <div class="info-card highlight-purple">
+                                    <div class="info-card-title">💰 Diretriz para Reembolsos via Pix</div>
+                                    <div class="info-card-text">
+                                        O reembolso via Pix é efetuado <strong>exclusivamente na conta bancária de
+                                            titularidade do comprador</strong> (mesmo CPF cadastrado na realização do
+                                        pedido na Estante Virtual).
+                                    </div>
+                                </div>
+
+                                <div class="callout-box danger" style="margin-top: 16px;">
+                                    <div class="callout-icon">🚫</div>
+                                    <div class="callout-content">
+                                        <strong>Contas Bancárias NÃO Aceitas para Estorno (Inquebrável):</strong>
+                                        Por motivos rigorosos de conformidade financeira e segurança antifraude, o
+                                        sistema <b>NÃO processa reembolsos</b> para:
+                                        <ul style="margin-left: 18px; margin-top: 6px; line-height: 1.6;">
+                                            <li>❌ <b>Contas de terceiros</b> (parentes, cônjuges ou conhecidos);</li>
+                                            <li>❌ <b>Contas conjuntas</b> (a menos que o comprador seja registrado como
+                                                o <b>titular principal</b>);</li>
+                                            <li>❌ <b>Contas-salário</b> (incompatíveis com recebimento de TED/PIX avulso
+                                                de estorno).</li>
+                                        </ul>
+                                    </div>
+                                </div>
+
+                                <div class="callout-box warning">
+                                    <div class="callout-icon">🪪</div>
+                                    <div class="callout-content">
+                                        <strong>Obrigatoriedade de Cadastro de CPF:</strong>
+                                        O preenchimento de um <b>CPF válido é estritamente obrigatório</b> para a
+                                        conclusão de qualquer compra no site, tanto para faturamento fiscal quanto para
+                                        garantia de estornos futuros.
+                                    </div>
+                                </div>
+
+                                <button class="btn-copy-macro"
+                                    onclick="copyMacroDirect('Para processar o reembolso via Pix, os valores são enviados unicamente para a conta do próprio titular do pedido (mesmo CPF). Por segurança, não é possível realizar estornos em contas de terceiros, contas conjuntas (caso não seja titular principal) ou contas salário.')">
+                                    📋 Copiar Regra de Titularidade PIX
+                                </button>
+                            </div>
+                        </details>
+
+                        <!-- ACORDEÃO 5: REGRAS DE CARRINHO E BUSCA -->
+                        <details class="regulation-accordion" data-category="carrinho" open>
+                            <summary class="accordion-summary">
+                                <div class="summary-left">
+                                    <span class="accordion-num">05</span>
+                                    <div>
+                                        <div class="summary-title-text">
+                                            Regras de Carrinho e Busca
+                                            <span class="summary-tag tag-turquoise">Plataforma & Catálogo</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="summary-right">
+                                    <span class="accordion-badge">Limites de Compra</span>
+                                    <span class="accordion-chevron">▼</span>
+                                </div>
+                            </summary>
+
+                            <div class="accordion-body">
+                                <div class="info-card highlight-teal">
+                                    <div class="info-card-title">🖼️ Diretriz de Capa Ilustrativa nos Anúncios</div>
+                                    <div class="info-card-text">
+                                        Quando o vendedor parceiro não cadastra e não envia a foto real do exemplar
+                                        disponível, a plataforma atribui automaticamente uma imagem padronizada de
+                                        catálogo contendo o aviso em destaque: <strong>"Capa ilustrativa"</strong>. O
+                                        analista de CS deve esclarecer ao cliente que os detalhes físicos do exemplar
+                                        (desgastes, marcas ou anotações) constam na descrição textual do livreiro.
+                                    </div>
+                                </div>
+
+                                <h4
+                                    style="font-size: 0.94rem; color: var(--ev-teal-dark); margin: 20px 0 10px 0; font-weight: 700;">
+                                    🛒 Limites Operacionais do Carrinho de Compras:
+                                </h4>
+                                <div class="info-grid">
+                                    <div class="info-card highlight-dark">
+                                        <div class="info-card-title">📚 Volume Máximo de Itens</div>
+                                        <div class="info-card-text">
+                                            O cliente pode adicionar e comprar <strong>até 60 livros por
+                                                pedido</strong>. Caso queira adquirir mais itens, deverá finalizar o
+                                            pedido atual e iniciar uma nova compra.
+                                        </div>
+                                    </div>
+
+                                    <div class="info-card highlight-purple">
+                                        <div class="info-card-title">🏬 Limite de Livreiros Diferentes</div>
+                                        <div class="info-card-text">
+                                            Em uma única transação de carrinho, o pedido pode conter livros provenientes
+                                            de <strong>até 9 livreiros diferentes</strong>.
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <button class="btn-copy-macro"
+                                    onclick="copyMacroDirect('Nosso catálogo aplica o aviso de \'Capa ilustrativa\' quando o livreiro não anexa foto real do exemplar, valendo os detalhes descritos no anúncio. Além disso, cada compra comporta até 60 livros de até 9 livreiros diferentes.')">
+                                    📋 Copiar Regras de Carrinho & Capa
+                                </button>
+                            </div>
+                        </details>
+
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========================================================
+             VIEW 3: ABA HUB DE MACROS (EM CONSTRUÇÃO / EMPTY STATE)
+             ======================================================== -->
+        <section id="viewMacros" class="view-section">
+            <div class="page-container">
+                <div class="breadcrumb-row">
+                    <a onclick="switchView('home')">Início (Hub)</a>
+                    <span>/</span>
+                    <strong>Hub de Macros</strong>
+                </div>
+
+                <div class="empty-state-card">
+                    <div class="empty-state-icon">📁</div>
+                    <span class="empty-state-badge">Em Construção</span>
+                    <h2 class="empty-state-title">Hub de Macros de Atendimento</h2>
+                    <p class="empty-state-desc">
+                        Hub de Macros em desenvolvimento. Aguardando conteúdo oficial da supervisão.
+                    </p>
+
+                    <div class="empty-state-features">
+                        <div class="empty-features-title">Recursos previstos para esta seção:</div>
+                        <ul class="empty-features-list">
+                            <li>✓ Biblioteca oficial de macros de Primeiro Contato (FCR)</li>
+                            <li>✓ Scripts padronizados para atrasos na entrega e Correios</li>
+                            <li>✓ Mensagens de mediação de conflitos entre leitores e livreiros</li>
+                            <li>✓ Atalho de cópia rápida com substituição de variáveis do pedido</li>
+                        </ul>
+                    </div>
+
+                    <button class="btn-back-home" onclick="switchView('home')">
+                        <span>←</span> Voltar para a Página Inicial
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========================================================
+             VIEW 4: ABA MANUAL OPERACIONAL
+             ======================================================== -->
+        <section id="viewManual" class="view-section">
+            <div class="page-container">
+                <div class="breadcrumb-row">
+                    <a onclick="switchView('home')">Início (Hub)</a>
+                    <span>/</span>
+                    <strong>Manual Operacional</strong>
+                </div>
+
+                <div class="simple-content-card">
+                    <h2 style="color: var(--ev-teal-dark); margin-bottom: 8px;">📖 Manual Operacional: Compra Garantida
+                    </h2>
+                    <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 24px;">Diretrizes operacionais
+                        para mediação e autorização de reembolso ao leitor.</p>
+
+                    <div class="callout-box danger">
+                        <div class="callout-icon">🛑</div>
+                        <div class="callout-content">
+                            <strong>REGRA DE OURO (INQUEBRÁVEL):</strong>
+                            O acionamento da Compra Garantida <b>só pode ser feito após o prazo oficial de entrega ter
+                                expirado</b> OU se houver comprovação inequívoca de recebimento de item divergente. Não
+                            prometa estorno antes de validar esses dois cenários com o livreiro.
+                        </div>
+                    </div>
+
+                    <div class="info-grid">
+                        <div class="info-card highlight-teal">
+                            <div class="info-card-title">1. Validação de Elegibilidade</div>
+                            <div class="info-card-text">
+                                • Pedido sem atualização de rastreio há mais de 3 dias úteis além da previsão.<br>
+                                • Livro entregue com edição incorreta ou danificado.<br>
+                                • Cancelamento sumário pelo vendedor por falta de estoque.
+                            </div>
+                        </div>
+
+                        <div class="info-card highlight-purple">
+                            <div class="info-card-title">2. Fluxo FCR</div>
+                            <div class="info-card-text">
+                                Priorize o encerramento do caso na primeira resposta. Caso elegível para reversa,
+                                forneça imediatamente o código de postagem nos Correios.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========================================================
+             VIEW 5: ABA ATENDIMENTO TÉCNICO
+             ======================================================== -->
+        <section id="viewTecnico" class="view-section">
+            <div class="page-container">
+                <div class="breadcrumb-row">
+                    <a onclick="switchView('home')">Início (Hub)</a>
+                    <span>/</span>
+                    <strong>Atendimento Técnico</strong>
+                </div>
+
+                <div class="simple-content-card">
+                    <h2 style="color: var(--ev-teal-dark); margin-bottom: 8px;">🛠️ Procedimentos de Suporte Técnico
+                    </h2>
+                    <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 24px;">Protocolos de
+                        contingência para falhas de sistema e plataformas parceiras.</p>
+
+                    <div class="info-card highlight-teal" style="margin-bottom: 16px;">
+                        <div class="info-card-title">Falhas de Login ou Recuperação de Senha</div>
+                        <div class="info-card-text">
+                            Oriente o leitor a limpar o cache do navegador ou utilizar guia anônima. Caso o e-mail não
+                            chegue na caixa de entrada, verifique a pasta de Spam/Lixo Eletrônico ou confirme o e-mail
+                            cadastrado na base Admin.
+                        </div>
+                    </div>
+
+                    <div class="info-card highlight-purple">
+                        <div class="info-card-title">Abertura de Chamados para Engenharia</div>
+                        <div class="info-card-text">
+                            Antes de acionar a equipe de produto via Jira, colete o ID do usuário, print do erro no
+                            console (F12) e a URL exata em que o comportamento inesperado ocorreu.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </div>
+
+    <!-- ========================================================
+         MODAL DE LOGIN / VALIDAÇÃO DO LÍDER (Gestão CS)
+         ======================================================== -->
+    <div id="leaderAuthModal" class="modal-overlay">
+        <div class="modal-card">
+            <button class="modal-close-btn" onclick="closeLeaderLoginModal()">✕</button>
+            <div class="modal-icon-badge">🔐</div>
+            <h3 class="modal-title">Acesso da Liderança CS</h3>
+            <p class="modal-desc">
+                Digite o e-mail corporativo autorizado da supervisão para gerenciar e publicar avisos operacionais no
+                Mural.
+            </p>
+
+            <input type="email" id="leaderEmailInput" class="modal-input"
+                placeholder="ex: lider.cs@estantevirtual.com.br" onkeypress="handleModalKeypress(event)">
+            <div id="modalErrorMessage" class="modal-error-msg">E-mail não autorizado para publicação no Mural de
+                Avisos.</div>
+
+            <button class="btn-modal-submit" onclick="validateLeaderEmail()">Validar Acesso</button>
+        </div>
+    </div>
+
+    <!-- Notificação Flutuante (Toast) -->
+    <div id="toastNotification" class="toast-notification">
+        <span>✓</span>
+        <span id="toastMessage">Procedimento executado com sucesso!</span>
+    </div>
+
+    <!-- ========================================================
+         JAVASCRIPT: LÓGICA DE NAVEGAÇÃO, AUTENTICAÇÃO E BUSCA
+         ======================================================== -->
+    <script>
+        // ========================================================
+        // REGRA DE NEGÓCIO: E-MAIL AUTORIZADO DO LÍDER
+        // ========================================================
+        const adminEmail = 'lider.cs@estantevirtual.com.br';
+        let isLeaderAuthenticated = false;
+
+        // Alternância de Telas (Views)
+        function switchView(viewName) {
+            // Remove classe ativa de todas as views
+            document.querySelectorAll('.view-section').forEach(view => {
+                view.classList.remove('active-view');
+            });
+
+            // Atualiza botões da barra superior
+            document.querySelectorAll('.nav-link-btn').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.getAttribute('data-target') === viewName) {
+                    btn.classList.add('active');
+                }
+            });
+
+            // Exibe a view selecionada
+            const targetView = document.getElementById(
+                viewName === 'home' ? 'viewHome' :
+                    viewName === 'regulamentos' ? 'viewRegulamentos' :
+                        viewName === 'macros' ? 'viewMacros' :
+                            viewName === 'manual' ? 'viewManual' : 'viewTecnico'
+            );
+
+            if (targetView) {
+                targetView.classList.add('active-view');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        }
+
+        // Navegar para um tópico específico de Regulamentos a partir dos Boxes da Home
+        function navigateToRegulationTopic(category) {
+            switchView('regulamentos');
+
+            // Ativa o filtro correspondente
+            const filterButtons = document.querySelectorAll('.filter-tag-pill');
+            filterButtons.forEach(btn => {
+                if (btn.getAttribute('onclick')?.includes(category)) {
+                    filterCategory(category, btn);
+                }
+            });
+
+            // Rola suavemente até o primeiro acordeão visível
+            setTimeout(() => {
+                const firstVisible = document.querySelector(`.regulation-accordion[data-category="${category}"]`);
+                if (firstVisible) {
+                    firstVisible.open = true;
+                    firstVisible.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }, 100);
+        }
+
+        // ========================================================
+        // SISTEMA DE GESTÃO E AUTENTICAÇÃO DO LÍDER
+        // ========================================================
+        function handleLeaderAuthButtonClick() {
+            if (isLeaderAuthenticated) {
+                // Se já estiver autenticado, rola até o painel na Home ou desloga
+                switchView('home');
+                const panel = document.getElementById('leaderPublishPanel');
+                panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                showToast('Você está operando como Líder CS');
+            } else {
+                openLeaderLoginModal();
+            }
+        }
+
+        function openLeaderLoginModal() {
+            const modal = document.getElementById('leaderAuthModal');
+            const input = document.getElementById('leaderEmailInput');
+            const errorMsg = document.getElementById('modalErrorMessage');
+
+            errorMsg.style.display = 'none';
+            input.value = '';
+            modal.classList.add('show');
+            setTimeout(() => input.focus(), 150);
+        }
+
+        function closeLeaderLoginModal() {
+            document.getElementById('leaderAuthModal').classList.remove('show');
+        }
+
+        function handleModalKeypress(event) {
+            if (event.key === 'Enter') {
+                validateLeaderEmail();
+            }
+        }
+
+        function validateLeaderEmail() {
+            const inputEmail = document.getElementById('leaderEmailInput').value.trim().toLowerCase();
+            const errorMsg = document.getElementById('modalErrorMessage');
+
+            if (inputEmail === adminEmail.toLowerCase()) {
+                // Autenticação bem-sucedida
+                isLeaderAuthenticated = true;
+                closeLeaderLoginModal();
+                updateLeaderUIAfterLogin();
+                showToast('Acesso de Líder CS confirmado com sucesso!');
+            } else {
+                // E-mail incorreto
+                errorMsg.style.display = 'block';
+                errorMsg.textContent = 'Acesso não autorizado. Apenas o e-mail oficial da liderança pode publicar.';
+            }
+        }
+
+        function updateLeaderUIAfterLogin() {
+            const publishPanel = document.getElementById('leaderPublishPanel');
+            const headerBtn = document.getElementById('btnLeaderHeader');
+            const leaderBtnText = document.getElementById('leaderBtnText');
+            const leaderBtnTrigger = document.getElementById('btnLeaderPanelTrigger');
+
+            // Exibe o painel de formulário no DOM
+            publishPanel.style.display = 'block';
+
+            // Atualiza botões no cabeçalho
+            headerBtn.classList.add('logged-in');
+            leaderBtnText.textContent = 'Líder Ativo';
+
+            if (leaderBtnTrigger) {
+                leaderBtnTrigger.style.display = 'none';
+            }
+
+            // Garante que o analista esteja na Home para ver o mural
+            switchView('home');
+            publishPanel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        function logoutLeader() {
+            isLeaderAuthenticated = false;
+
+            // Oculta o formulário de publicação
+            document.getElementById('leaderPublishPanel').style.display = 'none';
+
+            // Restaura o botão do header
+            const headerBtn = document.getElementById('btnLeaderHeader');
+            const leaderBtnText = document.getElementById('leaderBtnText');
+            const leaderBtnTrigger = document.getElementById('btnLeaderPanelTrigger');
+
+            headerBtn.classList.remove('logged-in');
+            leaderBtnText.textContent = 'Acesso Líder';
+
+            if (leaderBtnTrigger) {
+                leaderBtnTrigger.style.display = 'flex';
+            }
+
+            showToast('Sessão da liderança finalizada. Modo analista ativo.');
+        }
+
+        // Publicar Comunicado no Mural de Avisos
+        function publishNoticeByLeader() {
+            const titleInput = document.getElementById('noticeTitleInput');
+            const messageInput = document.getElementById('noticeMessageInput');
+            const title = titleInput.value.trim();
+            const message = messageInput.value.trim();
+
+            if (!title || !message) {
+                showToast('Por favor, preencha o título e a mensagem do comunicado.');
+                return;
+            }
+
+            // Cria novo card de aviso dinamicamente
+            const noticesList = document.getElementById('noticesList');
+            const newNoticeCard = document.createElement('div');
+            newNoticeCard.className = 'notice-card leader-notice';
+
+            const now = new Date();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const timeString = `Hoje às ${hours}:${minutes}`;
+
+            newNoticeCard.innerHTML = `
+                <div class="notice-icon-box">📢</div>
+                <div class="notice-content">
+                    <div class="notice-meta">
+                        <span class="notice-title">${escapeHtml(title)}</span>
+                        <span class="notice-time">Publicado ${timeString} • Líder CS</span>
+                    </div>
+                    <div class="notice-desc">
+                        ${escapeHtml(message)}
+                    </div>
+                </div>
+            `;
+
+            // Adiciona no início da lista
+            noticesList.insertBefore(newNoticeCard, noticesList.firstChild);
+
+            // Limpa os campos
+            titleInput.value = '';
+            messageInput.value = '';
+
+            showToast('📢 Comunicado publicado com sucesso no Mural de Avisos!');
+        }
+
+        // Previne injeção de HTML
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // ========================================================
+        // BUSCA RÁPIDA GLOBAL NO HUB
+        // ========================================================
+        function executeHubSearch() {
+            const query = document.getElementById('heroSearchInput').value.trim().toLowerCase();
+            if (!query) {
+                showToast('Digite uma palavra-chave para buscar.');
+                return;
+            }
+
+            // Muda para a tela de regulamentos e aplica a busca
+            switchView('regulamentos');
+            const accordions = document.querySelectorAll('.regulation-accordion');
+            let foundCount = 0;
+
+            accordions.forEach(acc => {
+                const text = acc.textContent.toLowerCase();
+                if (text.includes(query)) {
+                    acc.style.display = 'block';
+                    acc.open = true;
+                    foundCount++;
+                } else {
+                    acc.style.display = 'none';
+                }
+            });
+
+            showToast(`Busca concluída: ${foundCount} seção(ões) encontrada(s)`);
+        }
+
+        // Permite pressionar Enter na busca do Hero
+        document.getElementById('heroSearchInput')?.addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                executeHubSearch();
+            }
+        });
+
+        // ========================================================
+        // CONTROLES DA ABA REGULAMENTOS (Expandir, Filtrar, Copiar)
+        // ========================================================
+        function toggleAllAccordions(shouldOpen) {
+            const accordions = document.querySelectorAll('.regulation-accordion');
+            accordions.forEach(acc => acc.open = shouldOpen);
+            showToast(shouldOpen ? 'Todos os regulamentos expandidos' : 'Todos os regulamentos recolhidos');
+        }
+
+        function filterCategory(category, buttonElement) {
+            document.querySelectorAll('.filter-tag-pill').forEach(btn => btn.classList.remove('active'));
+            buttonElement.classList.add('active');
+
+            const accordions = document.querySelectorAll('.regulation-accordion');
+            let count = 0;
+
+            accordions.forEach(acc => {
+                if (category === 'all' || acc.getAttribute('data-category') === category) {
+                    acc.style.display = 'block';
+                    count++;
+                } else {
+                    acc.style.display = 'none';
+                }
+            });
+        }
+
+        function copyMacroDirect(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                showToast('📋 Macro copiada para a área de transferência!');
+            }).catch(() => {
+                showToast('Procedimento pronto para envio!');
+            });
+        }
+
+        // Notificação Toast
+        let toastTimeout;
+        function showToast(message) {
+            const toast = document.getElementById('toastNotification');
+            const toastMsg = document.getElementById('toastMessage');
+            toastMsg.textContent = message;
+            toast.classList.add('show');
+
+            clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+    </script>
+</body>
+
+</html>
