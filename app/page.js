@@ -1,13 +1,30 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import HomeView from '@/components/HomeView';
 import ColinhasBoard from '@/components/ColinhasBoard';
 import RegulamentosView from '@/components/RegulamentosView';
+import LinksView from '@/components/LinksView';
 
 export default function AppPrincipal() {
   const [activeView, setActiveView] = useState('home');
-  const [isSupervisor, setIsSupervisor] = useState(false);
+
+  // SIMULAÇÃO DO ESTADO DE SESSÃO CORPORATIVA (Futuramente via NextAuth / Auth.js)
+  // Altere o email aqui para testar:
+  // Se for um dos emails autorizados da liderança, isSupervisor vira true automaticamente.
+  const [usuarioLogado, setUsuarioLogado] = useState({
+    nome: 'Mariana Paiva',
+    email: 'supervisao@estantevirtual.com.br', // Teste trocando para 'analista@estantevirtual.com.br'
+    avatar: 'EV'
+  });
+
+  // Lista de e-mails de líderes autorizados (espelho do que estará na tabela do Railway)
+  const lideresAutorizados = [
+    'supervisao@estantevirtual.com.br'
+  ];
+
+  // A validação de supervisor é automática baseada no e-mail
+  const isSupervisor = lideresAutorizados.includes(usuarioLogado.email.toLowerCase());
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
@@ -22,7 +39,7 @@ export default function AppPrincipal() {
           </div>
         </a>
 
-        {/* MENU SUPERIOR */}
+        {/* MENU */}
         <nav>
           <ul className="hub-nav-menu">
             <li>
@@ -30,7 +47,7 @@ export default function AppPrincipal() {
                 className={`nav-link-btn ${activeView === 'home' ? 'active' : ''}`}
                 onClick={() => setActiveView('home')}
               >
-                <span>🏠</span> Início
+                <span className="nav-icon">🏠</span> Início
               </button>
             </li>
             <li>
@@ -38,7 +55,7 @@ export default function AppPrincipal() {
                 className={`nav-link-btn ${activeView === 'colinhas' ? 'active' : ''}`}
                 onClick={() => setActiveView('colinhas')}
               >
-                <span>📝</span> Colinhas
+                <span className="nav-icon">📝</span> Colinhas
               </button>
             </li>
             <li>
@@ -46,51 +63,40 @@ export default function AppPrincipal() {
                 className={`nav-link-btn ${activeView === 'regulamentos' ? 'active' : ''}`}
                 onClick={() => setActiveView('regulamentos')}
               >
-                <span>📜</span> Regulamentos
+                <span className="nav-icon">📜</span> Regulamentos
               </button>
             </li>
             <li>
               <button
-                className={`nav-link-btn ${activeView === 'tecnico' ? 'active' : ''}`}
-                onClick={() => setActiveView('tecnico')}
+                className={`nav-link-btn ${activeView === 'links' ? 'active' : ''}`}
+                onClick={() => setActiveView('links')}
               >
-                <span>🛠️</span> Técnico
+                <span className="nav-icon">🔗</span> Links Úteis
               </button>
             </li>
           </ul>
         </nav>
 
-        {/* LADO DIREITO (ACESSO LÍDER & PERFIL EQUIPE EV) */}
+        {/* PERFIL IDENTIFICADO VIA SSO (SEM BOTÃO MANUAL DE LÍDER) */}
         <div className="navbar-actions">
-          <button
-            className={`btn-leader-access ${isSupervisor ? 'logged-in' : ''}`}
-            onClick={() => setIsSupervisor(!isSupervisor)}
-          >
-            <span>🔐</span>
-            <span>{isSupervisor ? 'Líder Ativo' : 'Acesso Líder'}</span>
-          </button>
-
           <div className="user-chip">
-            <div className="avatar-circle">EV</div>
+            <div className="avatar-circle">
+              {usuarioLogado.avatar}
+            </div>
             <div className="user-caption">
-              Equipe EV
-              <span>Estante Virtual</span>
+              {usuarioLogado.nome}
+              <span>{isSupervisor ? 'Supervisão EV' : 'Equipe EV'}</span>
             </div>
           </div>
         </div>
       </header>
 
-      {/* ÁREA DE VISUALIZAÇÃO ATIVA */}
+      {/* ÁREA DE CONTEÚDO */}
       <main style={{ flex: 1 }}>
         {activeView === 'home' && <HomeView setView={setActiveView} />}
         {activeView === 'colinhas' && <ColinhasBoard isSupervisor={isSupervisor} />}
         {activeView === 'regulamentos' && <RegulamentosView />}
-        {activeView === 'tecnico' && (
-          <div style={{ textAlign: 'center', padding: '80px 20px', color: 'var(--text-muted)' }}>
-            <h2>🛠️ Suporte Técnico</h2>
-            <p>Em breve: checklists e diagnósticos de infraestrutura.</p>
-          </div>
-        )}
+        {activeView === 'links' && <LinksView />}
       </main>
 
     </div>
