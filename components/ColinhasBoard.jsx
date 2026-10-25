@@ -1,25 +1,28 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 export default function ColinhasBoard({ isSupervisor }) {
   const [agente, setAgente] = useState('');
-  const [isMounted, setIsMounted] = useState(false); // Controle de carregamento visual
+  const [isMounted, setIsMounted] = useState(false);
   const [categoriaAtiva, setCategoriaAtiva] = useState('Todas as Colinhas');
   const [termoBusca, setTermoBusca] = useState('');
   const [toast, setToast] = useState({ visivel: false, mensagem: '' });
   
   const [modalAberto, setModalAberto] = useState(false);
-  const [modalMascara, setModalMascara] = useState(null); // Modal específico para Máscaras
+  const [modalNota, setModalNota] = useState(null); 
+
+  // Referências para o Ctrl+A inteligente
+  const modalContainerRef = useRef(null);
+  const modalTextRef = useRef(null);
 
   const [formData, setFormData] = useState({
     id: null,
     t: '',
-    c: '🚫 Cancelamento & Reembolso',
+    c: '🚫 Cancelamento',
     txt: ''
   });
 
-  // CATEGORIAS OFICIAIS (Menu Lateral)
   const categoriasBase = [
     { id: 'Todas as Colinhas', nome: 'Todas as Colinhas', icone: '📑' },
     { id: '🗣️ Relacionamento', nome: 'Relacionamento & Finalização', icone: '🗣️' },
@@ -34,7 +37,6 @@ export default function ColinhasBoard({ isSupervisor }) {
     { id: '📋 Máscaras Internas', nome: 'Máscaras & Registros', icone: '📋' }
   ];
 
-  // FUNÇÃO AUXILIAR DE CORES
   const getCor = (cat) => {
     switch (cat) {
       case '🗣️ Relacionamento': return { bg: '#F5EEF8', border: '#D7BDE2' };
@@ -51,9 +53,7 @@ export default function ColinhasBoard({ isSupervisor }) {
     }
   };
 
-  // BANCO DE DADOS COMPLETO (Extraído 100% do PDF Operacional EV)
   const [colinhas, setColinhas] = useState([
-    // --- RELACIONAMENTO & FINALIZAÇÃO ---
     { id: 1, c: '🗣️ Relacionamento', t: 'Avaliação Padrão', txt: `Caso esteja tudo em ordem, dentro de 24 horas ⏱, você receberá um e-mail contendo uma pesquisa de avaliação sobre o meu atendimento:\nNotas 1 e 2 para ruim e notas 4 e 5 para muito bom!` },
     { id: 2, c: '🗣️ Relacionamento', t: 'Boas Festas', txt: `Agradecemos por ter feito parte da nossa história em 2025, é um privilégio ter você conosco. Desejamos um próspero 2026!` },
     { id: 3, c: '🗣️ Relacionamento', t: 'Reforço Cordialidade', txt: `Olá, XXXXXX!\n\nAgradecemos pelo retorno. Reforço nossa cordialidade para com os clientes, por ajudar a manter uma boa experiência para o cliente e refletir a qualidade do atendimento que buscamos oferecer.\n\nPrecisando de ajuda não hesite em me chamar, estou aqui, ok!` },
@@ -62,8 +62,6 @@ export default function ColinhasBoard({ isSupervisor }) {
     { id: 6, c: '🗣️ Relacionamento', t: 'Encerrar Ticket - Vai abrir outro', txt: `Olá, XXXXXX!\n\nEspero que você esteja bem!😉️\n\nContinuarei a tratativa do seu pedido XXXXXX, no protocolo XXXXXX.` },
     { id: 7, c: '🗣️ Relacionamento', t: 'Demorou para Entrar em Contato', txt: `Olá, XXXXXX!\n\nQuero expressar minhas sinceras desculpas pelo atraso. Sinto muito pelo inconveniente causado e estou empenhada em resolver essa situação.\n\nPercebemos que houve um atraso em acionar nosso atendimento em relação à sua solicitação. Gostaríamos de entender melhor o motivo desse atraso para podermos garantir que você receba o suporte necessário no tempo adequado.\n\nVocê poderia nos informar o que causou a demora em entrar em contato conosco? Estamos aqui para ajudar e queremos garantir que você receba o melhor atendimento possível.\n\nAguardamos seu retorno até o dia 27/10!` },
     { id: 8, c: '🗣️ Relacionamento', t: 'E-mail Sem Relação EV', txt: `Olá, XXX!\n\nAgradecemos por entrar em contato com a Estante Virtual!\n\nGostaríamos de esclarecer que este é um canal exclusivo para suporte relacionado aos pedidos e atendimentos realizados na Estante Virtual. Dessa forma, não conseguimos tratar por aqui de outros temas ou assuntos que não estejam vinculados às compras feitas em nosso site.\n\nCaso precise de qualquer ajuda com um pedido, pagamento, entrega ou devolução, estaremos à disposição para te auxiliar da melhor forma possível!\n\nAgradecemos muito pela compreensão e por fazer parte da nossa comunidade de leitores!` },
-
-    // --- MÁSCARAS INTERNAS ---
     { id: 9, c: '📋 Máscaras Internas', t: 'Assuntos Ticket (Lista de Títulos)', txt: `Exclusão do cadastro | CPF: XXX\nAlteração de e-mail | CPF: XXX\nAlteração de Endereço - Pedido XXX\nAguardando Envio - Pedido XXX\nEnvio - Pedido XXX\nCancelamento - Pedido XXX\nConsta Entregue - Pedido XXX\nCupom - Pedido XXX\nDevolução - Pedido XXX\nCancelou e Recebeu - Pedido XXX\nPedido Entregue {Atraso} - Pedido XXX\nEntrega - Pedido XXX\nPedido Entregue - Pedido XXX\nEntrega Atrasada - Pedido XXX\nFalta livro - Pedido XXX\nLivro Avariado - Pedido XXX\nDiferente do escolhido - Pedido XXX\nRecebeu produto a mais - Pedido XXX\nEntregue Outro Endereço - Pedido XXX\nIntegração do pedido - Pedido XXX\nNota Fiscal - Pedido XXX\nPagamento - Pedido XXXX\nPagamento Expirado - Pedido XXX\nRastreamento - Pedido XXX\nRastreio Inválido - Pedido XXX\nRetirada Correios - Pedido XXX\nReembolso - Pedido XXX\nPedido Antigo - Pedido XXX` },
     { id: 10, c: '📋 Máscaras Internas', t: 'Assunto GR (Títulos)', txt: `[Resgate Já] Consta Entregue (Exceção EV) - Pedido XXX\n[Resgate Já] Pedido de Desculpas - Pedido XXX\n[Resgate Já] Reembolso de Despesas - Pedido XXX\n[Resgate Já] Cumprimento de Oferta - Pedido XXX` },
     { id: 11, c: '📋 Máscaras Internas', t: 'Texto para Enviar para GR (Consta Entregue)', txt: `Liderança: Samira\nValor: R$XXX\nMotivo: Pedido de desculpas por consta entregue (exceção EV)\n\n(colocar print do rastreio dos Correios)` },
@@ -77,8 +75,6 @@ export default function ColinhasBoard({ isSupervisor }) {
     { id: 19, c: '📋 Máscaras Internas', t: 'Pedidos Pendentes (Avisos Padrão)', txt: `Bom dia!\nVendedor não responde\nPedido em Standby;\nCliente quer aguardar envio, mas ciente que se não tivermos retorno, seguiremos com cancelamento.\nPrazo retorno: 27/10\nXXX (forma de pagamento)\n\nBom dia!\nVendedor não responde\nRastreio com erro\nPrazo retorno: 27/10\nXXX (forma de pagamento)\n\nBom dia!\nVendedor não responde;\nCliente recebeu o pedido com livro faltante: XXX\nPrazo retorno: 27/10\nXXX (forma de pagamento)` },
     { id: 20, c: '📋 Máscaras Internas', t: 'Pedidos Pendentes (Avisos Padrão 2)', txt: `TRANSPORTADORA\nBom dia!\nVendedor não responde;\nRastreio parado;\nEntrega atrasada.\nPrazo retorno: 27/10\nXXX (forma de pagamento)\n\nBom dia!\nVendedor não responde;\nLivro entregue em endereço divergente.\nPrazo retorno: 27/10\nXXX (forma de pagamento)\n\nBom dia!\nVendedor não responde;\nCliente quer Nota Fiscal/Recibo.\nPrazo retorno: 27/10\nXXX (forma de pagamento)` },
     { id: 21, c: '📋 Máscaras Internas', t: 'Enviar Compliance (Máscara)', txt: `Boa tarde!\n\n* Cadastro no NCA já desativado;\n* A exclusão foi solicitada no dia xxx;\n* Cliente XXX migrou para a Freedom;\n* Cliente não possui compras ativas\n\nXXX\n\nSegue a confirmação dos dados:\nNome: xxxx\nE-mail: xxxxx\nCPF: xxxxxx\nTelefone: xxxxx\nProtocolo de atendimento: xxxxxx` },
-
-    // --- RASTREIO & ACOMPANHAMENTO ---
     { id: 22, c: '📦 Rastreio', t: 'Entrega Dentro do Prazo', txt: `Olá, XXX. Como está?\n\nO protocolo do atendimento é o XXX.\n\nVerifiquei sobre o seu pedido XXX e consta que o vendedor já efetuou a postagem com o código de rastreio xxxxx, sendo assim, o produto já está com os Correios para ser entregue para você!\n\nA previsão de entrega é para o dia xxxx, podendo chegar antes! Peço por gentileza que acompanhe sua entrega acessando o link: http://www.correios.com.br.\n\nSe precisar de mais alguma informação ou ajuda estou aqui!!!\n\nCaso esteja tudo em ordem, dentro de 24 horas ⏱, você receberá um e-mail contendo uma pesquisa de avaliação sobre o meu atendimento:\nNotas 1 e 2 para ruim e notas 4 e 5 para muito bom!` },
     { id: 23, c: '📦 Rastreio', t: 'Saiu para Entrega', txt: `Olá, XXX!\n\nO protocolo do seu atendimento é o: xxxxx\n\nIdentifiquei que seu pedido xxx saiu para entrega na data de hoje, xx/xx, conforme código de rastreio xxx 🎉\n\nVocê pode acompanhar o histórico de entrega no link https://rastreamento.correios.com.br/app/index.php.\n\nSe tiver dúvidas, basta retornar este contato, está bem?\n\nCaso esteja tudo em ordem, dentro de 24 horas ⏱, você receberá um e-mail contendo uma pesquisa de avaliação sobre o meu atendimento:\nNotas 1 e 2 para ruim e notas 4 e 5 para muito bom!` },
     { id: 24, c: '📦 Rastreio', t: 'Pedido Postado', txt: `Olá, XXX!\n\nO protocolo do seu atendimento é o: xxxxx\n\nVerifiquei que seu pedido foi postado junto aos Correios em xx/xx conforme código de rastreio xxxx!\n\nO prazo estimado para entrega é XXX e você pode acompanhar a evolução pelo link https://www.correios.com.br/.\n\nSigo à disposição.\n\nCaso esteja tudo em ordem, dentro de 24 horas ⏱, você receberá um e-mail contendo uma pesquisa de avaliação sobre o meu atendimento:\nNotas 1 e 2 para ruim e notas 4 e 5 para muito bom!` },
@@ -103,8 +99,6 @@ export default function ColinhasBoard({ isSupervisor }) {
     { id: 43, c: '📦 Rastreio', t: 'Entregue Em Outro Endereço (Cliente)', txt: `Olá, XXX!\n\nO protocolo do seu atendimento é o: xxxxx\n\nVerifiquei seu rastreio e consta entregue em outro local. Peço desculpas pelo ocorrido, de forma alguma desejávamos que estivesse passando por esta situação! 😔️\n\nComo pode ser apenas um erro no rastreio, acionei o vendedor e ele nos retornará até o dia 27/10 com a solução. Fique tranquilX, farei o acompanhamento até o final!\n\nEstou à disposição.` },
     { id: 44, c: '📦 Rastreio', t: 'Entregue Em Outro Endereço (Vendedor)', txt: `Olá, XXX, tudo bem?\n\nIdentifiquei que a entrega do pedido XXX foi realizada em um endereço divergente ao informado para entrega, conforme código de rastreio XXX.\n\nPor favor, verifique o rastreio correto ou faça cancelamento/reenvio. Aguardo retorno até o dia 27/10.\n\nSigo à disposição.` },
     { id: 45, c: '📦 Rastreio', t: 'Confirmar Endereço', txt: `Olá, XXX!\n\nO protocolo do seu atendimento é o: XXX\n\nPara prosseguir com seu atendimento, pode confirmar o endereço de entrega, por gentileza?\n\nDestinatário:\nRua:\nNúmero:\nComplemento:\nBairro:\nCidade:\nEstado:\nCEP:\n\nFico no aguardo até o dia 27/10!` },
-
-    // --- ATRASOS & CORREIOS ---
     { id: 46, c: '⏳ Atrasos', t: 'Entrega Atrasada (Vendedor WhatsApp/Site)', txt: `Olá, XXX!\n\nIdentificamos que a entrega do pedido XXX encontra-se com atraso.\n\nPor favor, entre em contato com os Correios e abra uma manifestação. Aguardamos seu retorno até o dia 27/10.\n\nPelo WhatsApp\n> Salve o número: (11) 4003-8210\n> Envie um "Oi" para iniciar o atendimento.\n> Opções no menu: Para Entrega Atrasada : Selecione a opção 1 - Remessa/Objeto postal não entregue.\n\nPelo Site\n> Acesse https://faleconosco.correios.com.br/faleconosco/app/index.php\n>Selecione a opção Reclamação > Entrega de Remessa/Objeto postal Nacional > Objeto postal não entregue.\n\nSe precisar de mais alguma informação acesse: painel.estantevirtual.com.br/contato!!!` },
     { id: 47, c: '⏳ Atrasos', t: 'Entrega Atrasada - Cobrar Vendedor', txt: `Olá, XXX!\n\nPor favor, nos mantenham atualizados sobre o protocolo XXX, referente a entrega atrasada do pedido XXX.\n\nAguardo retorno até o dia XXX.` },
     { id: 48, c: '⏳ Atrasos', t: 'Entrega Atrasada - Transportadora', txt: `Olá, XXX!\n\nA entrega do pedido XXX está atrasada. Por favor, entre em contato com a transportadora e solucione.\n\nAguardo retorno até o dia 27/10.` },
@@ -128,8 +122,6 @@ export default function ColinhasBoard({ isSupervisor }) {
     { id: 66, c: '⏳ Atrasos', t: 'Locker Correios', txt: `Olá, XXX!\n\nO protocolo do seu atendimento é o: xxxxx\n\nApós verificar com a área responsável, informo que, devido à recente atualização em nosso site, o cadastro de CEPs de Lockers dos Correios está temporariamente indisponível. Atualmente, nosso sistema aceita apenas CEPs de Caixas Postais e de endereços residenciais/comerciais.\n\nPeço sinceras desculpas pelo inconveniente causado. Estamos trabalhando para solucionar essa questão o mais breve possível.\n\nAgradeço a sua compreensão e estou sempre à disposição!\n\nCaso esteja tudo em ordem, dentro de 24 horas ⏱, você receberá um e-mail contendo uma pesquisa de avaliação sobre o meu atendimento:\nNotas 1 e 2 para ruim e notas 4 e 5 para muito bom!` },
     { id: 67, c: '⏳ Atrasos', t: 'Extravio - Cliente', txt: `Olá, XXX!\n\nRecebemos atualizações da sua entrega e o pedido não foi localizado no fluxo postal dos Correios. Lamento imensamente pelo ocorrido!\n\nSeguiremos com o cancelamento por aqui. Você receberá um retorno sobre o reembolso finalizado até o dia 27/10. Após essa confirmação, o valor deve ficar disponível em sua conta até o dia XXX.\n\nBasta acompanhar seu e-mail para mais informações, está bem? Como o pedido ainda está com os Correios, pode ser que a entrega aconteça. Mas fique tranquilX, caso receba os livros, peço que entre em contato conosco para um novo pagamento ou devolução. Se não desejá-los, pode recusar a entrega, por favor\n\nSe você ainda tiver alguma dúvida, estou à disposição.` },
     { id: 68, c: '⏳ Atrasos', t: 'Vendedor - Extravio', txt: `Olá, xxxx!\n\nReferente a este pedido, estamos seguindo com o cancelamento, devido ao extravio!\n\nNós já solicitamos que caso nosso cliente receba o pedido, siga com a recusa da entrega ou recebendo entre em contato conosco.\n\nExplicações sobre o processo de repasse do pedido ou se você receber o livro, por favor acione o seu suporte, pois vão seguir com as operações necessárias.\n\nAgradecemos pela compreensão e parceria sempre!` },
-    
-    // --- VENDEDOR & STANDBY ---
     { id: 69, c: '🏪 Vendedor', t: 'Standby dentro do prazo (2 Dias Úteis)', txt: `Olá, XXX!\n\nO protocolo do seu atendimento é o: xxxxx\n\nNossos vendedores têm um prazo de 2 dias úteis para enviar os pedidos após a confirmação do pagamento. Como o prazo do seu pedido XXX acaba hoje, XXX, pedimos que acompanhe o envio pelo site e se não atualizar até o dia XXX, nos retorne por aqui, por favor!\n\nFicamos à disposição para qualquer dúvida ou para esclarecer qualquer outra questão.\n\nCaso esteja tudo em ordem, dentro de 24 horas ⏱, você receberá um e-mail contendo uma pesquisa de avaliação sobre o meu atendimento:\nNotas 1 e 2 para ruim e notas 4 e 5 para muito bom!` },
     { id: 70, c: '🏪 Vendedor', t: 'Pedido Standby (Cobrar Vendedor)', txt: `Olá, XXX, tudo bem?\n\nLeitor entrou em contato relatando o atraso na postagem do pedido xxxxx. Identifiquei que o pedido ainda está com status “aguardando envio”.\n\nSolicito o código de rastreio atualizado até o dia 27/10.\n\nSigo à disposição.` },
     { id: 71, c: '🏪 Vendedor', t: 'Pedido Standby (Aviso Cliente)', txt: `Olá, XXXxx! Como está?\n\nO protocolo do seu atendimento é o: XXXxx\n\nSinto muito por esse tempo de espera além do previsto, de forma alguma desejávamos que estivesse passando por esta situação! 😔️\n\nAcionei o vendedor sobre o atraso no envio e ele nos retornará até o dia 27/10. Fique tranquilX, farei o acompanhamento até o final.` },
@@ -142,8 +134,6 @@ export default function ColinhasBoard({ isSupervisor }) {
     { id: 78, c: '🏪 Vendedor', t: 'Genérica - PP', txt: `Olá, XXX!\n\nNeste momento, estou encaminhando seu caso para a equipe responsável pelo suporte ao vendedor, para podermos resolver a situação quanto antes.\n\nVou acompanhar seu caso de perto e aguardar o retorno até o dia 27/10. Assim que tiver uma atualização, entrarei em contato para informá-lX.\n\nSe tiver qualquer dúvida ou precisar de algo, não hesite em me chamar. Estou à disposição!` },
     { id: 79, c: '🏪 Vendedor', t: 'Standby - PP', txt: `Olá, XXX!\n\nNeste momento, estou encaminhando seu caso para a equipe responsável pelo suporte ao vendedor, para podermos resolver a situação quanto antes.\n\nVou acompanhar seu caso de perto e aguardar o retorno até o dia 27/10. Caso não consigamos o envio, seguiremos com o cancelamento, tudo bem?! Assim que tiver uma atualização, entrarei em contato para informá-lo.\n\nSe tiver qualquer dúvida ou precisar de algo, não hesite em me chamar. Estou à disposição!` },
     { id: 80, c: '🏪 Vendedor', t: 'Genérica HIDE', txt: `Olá, XXX!\n\nO protocolo do seu atendimento é o: XXXxx\n\nPeço desculpas pelo ocorrido, de forma alguma desejávamos que estivesse passando por esta situação! 😔️\n\nDevido ao atraso no envio, seguiremos com o cancelamento e reembolso, conforme nosso compromisso assumido nos Termos de Uso e Condições da Compra Garantida.\n\nVocê receberá um retorno sobre a finalização até o dia XXX. Após essa confirmação, o valor deve ficar disponível em sua conta até o dia XXX. Basta acompanhar seu e-mail para mais informações, está bem?\n\nSe você ainda tiver alguma dúvida, estou à disposição.` },
-
-    // --- TROCAS, DEVOLUÇÕES & AVARIAS ---
     { id: 81, c: '🔄 Trocas', t: 'Pediu Foto - Já Enviado (Postado)', txt: `Olá, XXX. Como está?\n\nO protocolo do atendimento é o XXX.\n\nVerifiquei sobre o seu pedido XXX e consta que o vendedor já efetuou a postagem com o código de rastreio XXX, sendo assim, o produto já está com os Correios para ser entregue para você e não conseguimos solicitar as fotos. Sinto muito!\n\nA previsão de entrega é para o dia XXX, podendo chegar antes! Peço por gentileza que acompanhe sua entrega acessando o link: http://www.correios.com.br.\n\nSe não for o desejado, você poderá solicitar a devolução dentro do prazo de 7 dias corridos a partir do recebimento. Precisando de mais alguma informação ou ajuda estou aqui!!!\n\nCaso esteja tudo em ordem, dentro de 24 horas ⏱, você receberá um e-mail contendo uma pesquisa de avaliação sobre o meu atendimento:\nNotas 1 e 2 para ruim e notas 4 e 5 para muito bom!` },
     { id: 82, c: '🔄 Trocas', t: 'Pediu Foto - Já recebeu', txt: `Olá, XXX. Como está?\n\nO protocolo do atendimento é o XXX.\n\nVerifiquei sobre o seu pedido XXX e consta que foi entregue em XXX, pelo código de rastreio XXX. Sinto muito por não conseguir enviar a foto a tempo!\n\nSe não for o desejado, você poderá solicitar a devolução dentro do prazo de 7 dias corridos a partir do recebimento. Precisando de mais alguma informação ou ajuda estou aqui!!!\n\nCaso esteja tudo em ordem, dentro de 24 horas ⏱, você receberá um e-mail contendo uma pesquisa de avaliação sobre o meu atendimento:\nNotas 1 e 2 para ruim e notas 4 e 5 para muito bom!` },
     { id: 83, c: '🔄 Trocas', t: 'Procedimento Devolução - Correios (Módico)', txt: `Olá, XXX!\n\nO protocolo do seu atendimento é o: XXX\n\nPara realizar a devolução do pedido, é necessário enviá-lo pelos Correios. Informe que deseja a modalidade de envio “Impresso Normal”, com acréscimo de “Registro Módico”.\n\nAtenção! Para que possamos agilizar, realize a devolução até o dia XXX, tá bom?\n\nO endereço para envio é:\n📌 XXX\n\nAh! É importante que você leve o produto já embalado. Os custos adicionais de embalagem não serão reembolsados pelo vendedor.\n\nApós postagem, responda esse e-mail com o comprovante legível completo, com código de rastreamento e o valor pago.\n\n(CASO DE COMPRA POR CARTÃO - apagar essa parte)\nO valor do pedido será estornado no cartão e o reembolso do frete será feito via depósito na conta bancária. Por gentileza, nos encaminhe os dados abaixo:\n\n(CASO DE COMPRA POR PIX- apagar essa parte)\nO valor do pedido será estornado na sua chave pix, e o reembolso do frete será feito via depósito na conta bancária. Por gentileza, nos encaminhe os dados abaixo:\n\nNome do titular:\nCPF/CNPJ:\nBanco:\nConta com dígito:\nAgência com dígito:\nConta corrente ou poupança:\n\nSe tiver alguma dúvida, estamos aqui para te ajudar!` },
@@ -177,8 +167,6 @@ export default function ColinhasBoard({ isSupervisor }) {
     { id: 111, c: '🔄 Trocas', t: 'Venda Proibida - Não Liberado (Enviou Foto)', txt: `Olá, xxxxx. Como está?\n\nO protocolo do atendimento é o xxxx.\n\nSuper entendemos sua preocupação e estamos aqui para esclarecer tudinho para você, 😉️!\n\nEm relação ao livro que você adquiriu, a venda dele realmente não é permitida. Agradecemos por ter nos notificado e pelo envio das fotos!\n\nAbri uma solicitação junto ao setor responsável para que notifique o vendedor sobre o seu pedido e este siga com o cancelamento e liberação do estorno/reembolso após o recebimento do mesmo em seu acervo/estoque.\n\nPrecisamos que realize a devolução do livro, segue abaixo as instruções:\nxxxx (endereço do vendedor) ou solicitar/gerar reversa\n\nSe precisar de mais alguma informação ou ajuda estou aqui!!!` },
     { id: 112, c: '🔄 Trocas', t: 'Venda Proibida - Vendedor', txt: `Olá, XXX. Como está?\n\nVerificamos que o livro enviado no pedido trata-se de um exemplar de distribuição gratuita, ou seja, de destinação pública, portanto, a venda é proibida, estamos lhe enviando as fotos. Tal proibição consta em nossos termos de uso item e também é prevista por Lei.\n\nSolicitamos por gentileza a imediata exclusão de quaisquer outros exemplares de venda proibida.\n\nQuanto ao pedido, estamos orientando o cliente sobre a devolução para você e precisamos que siga com o cancelamento e liberação do reembolso do pedido e custos com a postagem, após o recebimento.\n\nSe precisar de mais alguma informação ou ajuda orientamos acionar o seu suporte no seu painel!!` },
     { id: 113, c: '🔄 Trocas', t: 'Pedir Foto', txt: `Olá, XXX!\n\nO protocolo do seu atendimento é o: XXX\n\nGostaria de começar pedindo sinceras desculpas pelo ocorrido e por qualquer transtorno que tenha sido causado.\n\nPara que eu possa garantir um atendimento mais adequado, poderia me encaminhar fotos do livro recebido e da etiqueta no pacote, por favor?\n\nAguardo seu retorno até o dia 27/10 e agradeço pela sua compreensão e paciência.` },
-
-    // --- CANCELAMENTO & REEMBOLSO ---
     { id: 114, c: '🚫 Cancelamento', t: 'Solicitou Cancelamento/Reembolso (Aviso Cliente)', txt: `Olá, XXX!\n\nO protocolo do seu atendimento é o: XXX\n\nAcionei o vendedor para efetuar o cancelamento e reembolso do pedido XXX, ele nos retornará até o dia 27/10.\n\nFique tranquilX, farei o acompanhamento até o final.` },
     { id: 115, c: '🚫 Cancelamento', t: 'Solicitou Cancelamento (Já Postado / Possível Envio)', txt: `Olá, XXX!\n\nO protocolo do seu atendimento é o: XXX\n\nAcionei o vendedor para efetuar o cancelamento e reembolso do pedido. Ele nos retornará até o dia 27/10, entretanto, pode ser que o processo de envio já tenha começado e ele não conseguirá seguir com a solicitação.\n\nFique tranquilX! Farei o acompanhamento até o final e te manterei atualizadX.` },
     { id: 116, c: '🚫 Cancelamento', t: 'Solicitou Cancelamento - Vendedor', txt: `Olá, XXX.\n\nPor favor, prossiga com o cancelamento e reembolso do pedido XXX, conforme solicitado pelo comprador por motivo de XXX.\n\nAguardo seu retorno até o dia 27/10.` },
@@ -196,8 +184,6 @@ export default function ColinhasBoard({ isSupervisor }) {
     { id: 128, c: '🚫 Cancelamento', t: 'Entrega Atrasada - Cancelamento', txt: `Olá, XXX!\n\nO protocolo do seu atendimento é o: xxxxx\n\nPrimeiramente, nossas sinceras desculpas pelo ocorrido com o seu pedido XXX. Fomos informados de que houve uma falha pontual no sistema dos Correios, mas eles já estão trabalhando com prioridade para finalizar todas as entregas o mais rápido possível.\n\nEntretanto, seguiremos com o cancelamento por aqui, como solicitado. Você receberá um retorno sobre o reembolso finalizado até o dia 27/10. Após essa confirmação, o valor deve ficar disponível em sua conta até o dia XXX.\n\nBasta acompanhar seu e-mail para mais informações, está bem? Como o pedido ainda está com os Correios, pode ser que a entrega aconteça. Caso receba o livro, peço que recuse a entrega ou entre em contato conosco para um novo pagamento ou devolução, por favor!\n\nSe você ainda tiver alguma dúvida, estou à disposição.` },
     { id: 129, c: '🚫 Cancelamento', t: 'Exceção (Geral)', txt: `Olá, XXX!\n\nObrigada pelo retorno!\n\nSeguiremos com o atendimento em exceção por aqui. Você receberá um retorno sobre a finalização até o dia 27/10. Após essa confirmação, o valor deve ficar disponível em sua conta até o dia XXX.\n\nBasta acompanhar seu e-mail para mais informações, está bem? Caso localize o livro, peço que entre em contato conosco para um novo pagamento ou devolução, por favor!\n\nSe você ainda tiver alguma dúvida, estou à disposição.` },
     { id: 130, c: '🚫 Cancelamento', t: 'Vendedor (Aviso de Cancelamento Excepcional)', txt: `Olá, xxxx!\n\nReferente a este pedido, estamos seguindo com o cancelamento, conforme a solicitação do cliente!\n\nNós já solicitamos que caso nosso cliente receba o pedido, siga com a recusa da entrega ou recebendo entre em contato conosco.\n\nExplicações sobre o processo de repasse do pedido ou se você receber o livro, por favor acione o seu suporte, pois vão seguir com as operações necessárias.\n\nAgradecemos pela compreensão e parceria sempre!` },
-
-    // --- FINANCEIRO, PAGAMENTOS & NF ---
     { id: 131, c: '💳 Financeiro', t: 'Reembolso Frete Devolução - Pagou PAC', txt: `Olá, XXXx, boa tarde!\n\nQuero expressar minhas sinceras desculpas pelo transtorno. Sinto muito pelo inconveniente causado e estou empenhada em resolver essa situação.\n\nVi que fez a devolução por Pac/Sedex/Impresso Nacional. Nesse caso só será reembolsado o valor relativo ao “Impresso Normal”, com acréscimo de “Registro Módico”, como informado nas instruções da postagem.\n\nSigo à disposição.` },
     { id: 132, c: '💳 Financeiro', t: 'Reembolsado - PIX', txt: `Olá, XXXxx! Como está?\n\nO protocolo do seu atendimento é o: XXXxx\n\nVerifiquei sobre o seu pedido XXX e consta cancelado devido à XXX. Peço desculpas pelo ocorrido, de forma alguma desejava que estivesse passando por esta situação! 😔️\n\nConfirmei que foi liberado o reembolso pelo vendedor no dia XXX e você receberá o valor via pix até o dia XXX, na mesma conta que o pagamento do pedido foi realizado. Em anexo se encontra o comprovante!\n\nSe ficou com dúvida, por favor, me retorna por aqui para te ajudar. 🤗️\n\nCaso esteja tudo em ordem, dentro de 24 horas ⏱, você receberá um e-mail contendo uma pesquisa de avaliação sobre o meu atendimento:\nNotas 1 e 2 para ruim e notas 4 e 5 para muito bom!` },
     { id: 133, c: '💳 Financeiro', t: 'Reembolsado - Cartão', txt: `Olá, XXXxx! Como está?\n\nO protocolo do seu atendimento é o: XXXxx\n\nVerifiquei sobre o seu pedido XXXxx e consta cancelado devido à XXX. Peço desculpas pelo ocorrido, de forma alguma desejava que estivesse passando por esta situação! 😔️\n\nConfirmei que foi liberado o reembolso pelo vendedor no dia XXXxx e o estorno estará disponível na sua fatura até o dia XXX, dependendo da data de fechamento do seu cartão de crédito.\n\nEm anexo se encontra o comprovante! Caso tenha dúvidas sobre como o estorno será repassado ou os prazos, recomendo entrar em contato diretamente com a operadora do seu cartão, que poderá orientá-lo melhor.\n\nSe ficou com dúvida, por favor, me retorna por aqui para te ajudar. 🤗️\n\nCaso esteja tudo em ordem, dentro de 24 horas ⏱, você receberá um e-mail contendo uma pesquisa de avaliação sobre o meu atendimento:\nNotas 1 e 2 para ruim e notas 4 e 5 para muito bom!` },
@@ -226,8 +212,6 @@ export default function ColinhasBoard({ isSupervisor }) {
     { id: 156, c: '💳 Financeiro', t: 'Não quer passar dados bancários', txt: `Olá, XXX!\n\nEntendemos perfeitamente a sua vontade de escolher outro livro e sentimos muito por não conseguirmos oferecer essa opção no momento. 😔\n\nPor ora, precisamos seguir com o processo de reembolso para resolver a situação da forma mais rápida e segura. Pedimos, por gentileza, que nos envie os dados bancários até o dia 27/10, para que possamos dar continuidade ao atendimento.\n\nEstamos à disposição para ajudar com o que for preciso!` },
     { id: 157, c: '💳 Financeiro', t: 'Alterar Forma de Pagamento', txt: `Olá, XXX!\n\nO protocolo do seu atendimento é o: XXX\n\nSinto muito, após a conclusão do pedido não é possível alterar a forma de pagamento. Para prosseguir, será necessário realizar uma nova compra escolhendo o meio de pagamento desejado.\n\nFico à disposição para quaisquer dúvidas ou ajuda necessária!\n\nCaso esteja tudo em ordem, dentro de 24 horas ⏱, você receberá um e-mail contendo uma pesquisa de avaliação sobre o meu atendimento:\nNotas 1 e 2 para ruim e notas 4 e 5 para muito bom!` },
     { id: 158, c: '💳 Financeiro', t: 'Parcelamento', txt: `Olá, XXX. Espero que você esteja bem!\n\nGostaria de te informar sobre o novo modelo de parcelamento no cartão de crédito.\nAgora, para parcelar uma compra, é necessário que cada parcela tenha o valor mínimo de R$30,00.\n\n👉 Por exemplo:\nCompras acima de R$60,00 podem ser parceladas em 2 vezes;\nCompras acima de R$90,00, em 3 vezes, e assim por diante — até o máximo de 5 parcelas.\n\nSe tiver qualquer dúvida ou precisar de ajuda, estou à disposição para te auxiliar!\n\nCaso esteja tudo em ordem, dentro de 24 horas ⏱, você receberá um e-mail contendo uma pesquisa de avaliação sobre o meu atendimento:\nNotas 1 e 2 para ruim e notas 4 e 5 para muito bom!` },
-
-    // --- CADASTRO, LOGIN & SEGURANÇA ---
     { id: 159, c: '🔐 Cadastro', t: 'Erro Acessar Site', txt: `Olá, XXXXXXXXX!\n\nO protocolo do seu atendimento é o: xxxxx\n\nLamentamos pelo inconveniente causado. Para resolver essa questão, sugerimos que você limpe o cache do seu dispositivo ou experimente utilizar outro navegador, como o Internet Explorer, Google Chrome, Mozilla Firefox, Opera ou Chromium.\n\nTambém recomendamos que você evite usar o preenchimento automático de dados em nosso portal. Para garantir que o sistema leia as informações, sugerimos que você preencha os campos de forma digitada.\n\nPor favor, tente acessar o site novamente e se o erro persistir, me retorna por aqui, por favor!\n\nCaso esteja tudo em ordem, dentro de 24 horas ⏱, você receberá um e-mail contendo uma pesquisa de avaliação sobre o meu atendimento:\nNotas 1 e 2 para ruim e notas 4 e 5 para muito bom!` },
     { id: 160, c: '🔐 Cadastro', t: 'Fora Regra Imigração', txt: `Olá, XXXXXX! Esperamos que você esteja bem!\n\nO protocolo do seu atendimento é o: xxxxx\n\nDevido à atualização em nosso site, será necessário que você realize um novo cadastro para garantir uma experiência otimizada e aproveitar as novas funcionalidades que preparamos para você.\n\nO processo é rápido e simples! Ao se cadastrar novamente, você terá acesso a todos os recursos e melhorias que desenvolvemos para facilitar suas compras e navegação.\n\nCaso precise de ajuda ou tenha qualquer dúvida, nossa equipe está à disposição para auxiliá-lo.\n\nAgradecemos pela sua compreensão e esperamos vê-lo em breve aproveitando as novidades do nosso site!\n\nCaso esteja tudo em ordem, dentro de 24 horas ⏱, você receberá um e-mail contendo uma pesquisa de avaliação sobre o meu atendimento:\nNotas 1 e 2 para ruim e notas 4 e 5 para muito bom!` },
     { id: 161, c: '🔐 Cadastro', t: 'Dentro Regra Imigração 1', txt: `Olá, XXXXXX!\n\nIdentificamos que no momento em que você tentou acessar o site da Estante Virtual, ocorreu uma intermitência temporária no sistema e nossa equipe de tecnologia já fez o devido ajuste.\n\nPedimos que tente fazer novamente o login com seu e-mail e senha. Caso tenha esquecido sua senha, é possível redefini-la facilmente clicando na opção "Esqueci minha senha".\n\nAo conectar, é essencial que atualize os dados cadastrais para continuar no site novo. Se algum erro aparecer, por favor, tire um print da tela e nos envie o mais rápido possível para que possamos ajudar.\n\nSigo à disposição.\n\nCaso esteja tudo em ordem, dentro de 24 horas ⏱, você receberá um e-mail contendo uma pesquisa de avaliação sobre o meu atendimento:\nNotas 1 e 2 para ruim e notas 4 e 5 para muito bom!` },
@@ -304,6 +288,13 @@ export default function ColinhasBoard({ isSupervisor }) {
     { id: 230, c: '🛒 Plataforma', t: 'Programa Compra e Volta', txt: `Olá, XXX!\n\nO protocolo do seu atendimento é o: xxxxx\n\nA Estante Virtual está com a parceria com o Programa Compra e Volta! Para maiores informações, entre em contato com eles através dos canais abaixo:\n\nSite: https://www.compraevolta.com.br/\nE-mail: atendimento@compraevolta.com.br\nTelefone: 0800 761 7300\nHorário funcionamento: Segunda a sexta 08h às 20h e sábado 09h às 16h\nHorário de Brasília\n*exceto feriados\n\nSigo à disposição.\n\nCaso esteja tudo em ordem, dentro de 24 horas ⏱, você receberá um e-mail contendo uma pesquisa de avaliação sobre o meu atendimento:\nNotas 1 e 2 para ruim e notas 4 e 5 para muito bom!` }
   ]);
 
+  // Foco automático no modal quando ele é aberto para permitir o Ctrl+A imediato
+  useEffect(() => {
+    if (modalNota && modalContainerRef.current) {
+      modalContainerRef.current.focus();
+    }
+  }, [modalNota]);
+
   useEffect(() => {
     const salvo = localStorage.getItem('capitu_agente_nome');
     if (salvo) setAgente(salvo);
@@ -316,26 +307,18 @@ export default function ColinhasBoard({ isSupervisor }) {
     localStorage.setItem('capitu_agente_nome', valor);
   };
 
-  // Lógica de Assinatura Automática Protegida contra Duplicidade
   const compilarTexto = (template, categoria) => {
     const nome = agente.trim();
     let final = template;
 
     if (nome) {
-      // Se há nome preenchido, substitui a tag onde houver
       final = final.replace(/{agente}/gi, nome);
-      
-      // Adiciona a assinatura final apenas se não for máscara interna e já não houver assinatura parecida
       if (categoria !== '📋 Máscaras Internas' && !final.includes('Atenciosamente') && !final.includes('Liderança:')) {
         final += `\n\nAtenciosamente,\n${nome}\nEquipe Estante Virtual 💚`;
       }
     } else {
-      // SE NÃO TIVER NOME PREENCHIDO:
-      // Remove textos engessados que ficam estranhos em branco
       final = final.replace(/Me chamo {agente} e /gi, '');
       final = final.replace(/Me chamo {agente}/gi, 'Aqui é da Equipe Estante Virtual');
-      
-      // Remove quebras duplas de assinatura para não encavalar
       final = final.replace(/\n{agente}\nEquipe Estante Virtual/gi, '\nEquipe Estante Virtual');
       final = final.replace(/{agente}/gi, 'Equipe Estante Virtual');
 
@@ -344,23 +327,6 @@ export default function ColinhasBoard({ isSupervisor }) {
       }
     }
     return final;
-  };
-
-  const copiarColinha = (template, titulo, categoria) => {
-    const textoPronto = compilarTexto(template, categoria);
-    navigator.clipboard.writeText(textoPronto).then(() => {
-      setToast({ visivel: true, mensagem: `📋 Colinha "${titulo}" copiada!` });
-      setTimeout(() => setToast({ visivel: false, mensagem: '' }), 2500);
-    });
-  };
-
-  // Direcionador de clique: Copiar ou Abrir Máscara
-  const handleClickCard = (colinha) => {
-    if (colinha.c === '📋 Máscaras Internas') {
-      setModalMascara(colinha);
-    } else {
-      copiarColinha(colinha.txt, colinha.t, colinha.c);
-    }
   };
 
   const abrirModalCriar = () => {
@@ -387,7 +353,6 @@ export default function ColinhasBoard({ isSupervisor }) {
     setTimeout(() => setToast({ visivel: false, mensagem: '' }), 2500);
   };
 
-  // Filtros em tempo real
   const colinhasFiltradas = colinhas.filter((c) => {
     const bateCategoria = categoriaAtiva === 'Todas as Colinhas' || c.c === categoriaAtiva;
     const bateBusca =
@@ -418,7 +383,7 @@ export default function ColinhasBoard({ isSupervisor }) {
           <span style={{ fontSize: '1.25rem', color: 'var(--ev-teal-primary)' }}>🔍</span>
           <input
             type="text"
-            placeholder="Pesquise por qualquer palavra no título ou conteúdo das colinhas..."
+            placeholder="Pesquise por qualquer termo, SLA, regra de frete, devolução..."
             value={termoBusca}
             onChange={(e) => setTermoBusca(e.target.value)}
             style={{
@@ -449,11 +414,20 @@ export default function ColinhasBoard({ isSupervisor }) {
         </div>
       </div>
 
-      {/* LAYOUT: LATERAL + ÁREA DE CONTEÚDO */}
+      {/* LAYOUT: MENU LATERAL + CONTEÚDO */}
       <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: '28px', alignItems: 'start' }}>
         
-        {/* MENU LATERAL DE CATEGORIAS */}
-        <aside style={{ display: 'flex', flexDirection: 'column', gap: '8px', position: 'sticky', top: '100px' }}>
+        {/* MENU LATERAL COM BARRA DE ROLAGEM INDEPENDENTE */}
+        <aside style={{ 
+          display: 'flex', 
+          flexDirection: 'column', 
+          gap: '8px', 
+          position: 'sticky', 
+          top: '100px',
+          maxHeight: 'calc(100vh - 120px)',
+          overflowY: 'auto',
+          paddingRight: '6px'
+        }}>
           {categoriasBase.map((cat) => {
             const isAtiva = categoriaAtiva === cat.id;
             return (
@@ -495,18 +469,17 @@ export default function ColinhasBoard({ isSupervisor }) {
           })}
         </aside>
 
-        {/* CONTAINER DO CONTEÚDO (CARDS KEEP) */}
+        {/* ÁREA DOS CARDS ESTILO GOOGLE KEEP */}
         <main style={{ minHeight: '600px' }}>
           <div style={{ marginBottom: '20px' }}>
             <h2 style={{ fontSize: '1.4rem', fontWeight: '800', color: 'var(--ev-teal-dark)', margin: '0 0 6px 0' }}>
               {categoriaAtiva}
             </h2>
             <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-muted)' }}>
-              {colinhasFiltradas.length} {colinhasFiltradas.length === 1 ? 'colinha encontrada' : 'colinhas encontradas'}.
+              {colinhasFiltradas.length} {colinhasFiltradas.length === 1 ? 'colinha disponível' : 'colinhas disponíveis'}. Clique no card para abrir e selecionar o texto.
             </p>
           </div>
 
-          {/* Oculta os cards enquanto processa localStorage (resolve o salto de tela) */}
           <div style={{ opacity: isMounted ? 1 : 0, transition: 'opacity 0.2s ease-in' }}>
             {isMounted && colinhasFiltradas.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-muted)', background: '#FFF', borderRadius: '16px', border: '1px dashed var(--border-subtle)' }}>
@@ -520,7 +493,7 @@ export default function ColinhasBoard({ isSupervisor }) {
                   return (
                     <div
                       key={c.id}
-                      onClick={() => handleClickCard(c)}
+                      onClick={() => setModalNota(c)} // TODAS AS NOTAS ABREM EM MODAL
                       style={{
                         backgroundColor: cores.bg,
                         border: `1px solid ${cores.border}`,
@@ -553,14 +526,13 @@ export default function ColinhasBoard({ isSupervisor }) {
                       
                       <h4 style={{ margin: '0 0 12px 0', fontSize: '1rem', color: 'var(--text-dark)', fontWeight: '800' }}>{c.t}</h4>
                       
-                      <div style={{ fontSize: '0.86rem', color: '#334155', lineHeight: '1.6', whiteSpace: 'pre-wrap', maxHeight: '240px', overflowY: 'hidden', position: 'relative' }}>
+                      <div style={{ fontSize: '0.86rem', color: '#334155', lineHeight: '1.6', whiteSpace: 'pre-wrap', maxHeight: '200px', overflowY: 'hidden', position: 'relative' }}>
                         {compilarTexto(c.txt, c.c)}
-                        {/* Máscara de degrade para textos longos no card */}
-                        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '30px', background: `linear-gradient(transparent, ${cores.bg})` }}></div>
+                        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '36px', background: `linear-gradient(transparent, ${cores.bg})` }}></div>
                       </div>
 
                       <div style={{ marginTop: '14px', paddingTop: '10px', borderTop: '1px dashed rgba(0, 0, 0, 0.1)', textAlign: 'right', fontSize: '0.76rem', fontWeight: '700', color: 'var(--ev-teal-primary)' }}>
-                        {c.c === '📋 Máscaras Internas' ? 'Clique para abrir e copiar 🔍' : 'Clique no card para copiar 📋'}
+                        Clique para expandir nota 🔍
                       </div>
                     </div>
                   );
@@ -571,36 +543,129 @@ export default function ColinhasBoard({ isSupervisor }) {
         </main>
       </div>
 
-      {/* MODAL MÁSCARAS INTERNAS (SELEÇÃO DE TEXTO MANUAL) */}
-      {modalMascara && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 30, 30, 0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200, padding: '20px' }} onClick={() => setModalMascara(null)}>
-          <div style={{ background: '#FFFFFF', borderRadius: '16px', width: '100%', maxWidth: '700px', padding: '28px', boxShadow: 'var(--shadow-lg)', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
-            
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+      {/* MODAL EXPANDIDO ESTILO GOOGLE KEEP COM PROTEÇÃO DE CTRL+A */}
+      {modalNota && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0, left: 0, right: 0, bottom: 0,
+            backgroundColor: 'rgba(0, 30, 30, 0.55)',
+            backdropFilter: 'blur(3px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1200,
+            padding: '20px'
+          }}
+          onClick={() => setModalNota(null)}
+        >
+          <div
+            ref={modalContainerRef}
+            tabIndex={0}
+            onKeyDown={(e) => {
+              // Intercepta Ctrl+A (ou Cmd+A) para selecionar APENAS o texto do modal
+              if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
+                e.preventDefault();
+                const selection = window.getSelection();
+                const range = document.createRange();
+                range.selectNodeContents(modalTextRef.current);
+                selection.removeAllRanges();
+                selection.addRange(range);
+              }
+            }}
+            style={{
+              background: '#FFFFFF',
+              borderRadius: '16px',
+              width: '100%',
+              maxWidth: '720px',
+              padding: '28px',
+              boxShadow: 'var(--shadow-lg)',
+              maxHeight: '90vh',
+              display: 'flex',
+              flexDirection: 'column',
+              border: `2px solid ${getCor(modalNota.c).border}`,
+              outline: 'none' // Evita borda azul feia de foco no Chrome
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* CABEÇALHO DO MODAL */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
               <div>
-                <span style={{ fontSize: '0.75rem', fontWeight: '800', textTransform: 'uppercase', color: 'var(--ev-teal-primary)', letterSpacing: '0.5px' }}>{modalMascara.c}</span>
-                <h3 style={{ margin: '4px 0 0 0', color: 'var(--ev-teal-dark)', fontSize: '1.4rem' }}>{modalMascara.t}</h3>
+                <span style={{ fontSize: '0.75rem', fontWeight: '800', textTransform: 'uppercase', color: 'var(--ev-teal-primary)', letterSpacing: '0.5px' }}>
+                  {modalNota.c}
+                </span>
+                <h3 style={{ margin: '4px 0 0 0', color: 'var(--ev-teal-dark)', fontSize: '1.35rem', fontWeight: '800' }}>
+                  {modalNota.t}
+                </h3>
               </div>
-              <button onClick={() => setModalMascara(null)} style={{ background: '#F1F5F9', border: 'none', width: '36px', height: '36px', borderRadius: '50%', fontSize: '1.1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748B' }}>✖</button>
+              <button
+                onClick={() => setModalNota(null)}
+                style={{
+                  background: '#F1F5F9',
+                  border: 'none',
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '50%',
+                  fontSize: '1.1rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#64748B'
+                }}
+              >
+                ✖
+              </button>
             </div>
 
-            <div style={{ background: '#F8FAFC', padding: '20px', borderRadius: '12px', border: '1px solid #E2E8F0', whiteSpace: 'pre-wrap', color: '#334155', fontSize: '0.95rem', lineHeight: '1.7', userSelect: 'text', overflowY: 'auto', flex: 1 }}>
-              {compilarTexto(modalMascara.txt, modalMascara.c)}
+            {/* CORPO DO TEXTO (ONDE O CTRL+A VAI ATUAR) */}
+            <div
+              ref={modalTextRef}
+              style={{
+                background: getCor(modalNota.c).bg,
+                padding: '22px',
+                borderRadius: '12px',
+                border: `1px solid ${getCor(modalNota.c).border}`,
+                whiteSpace: 'pre-wrap',
+                color: '#1E293B',
+                fontSize: '0.94rem',
+                lineHeight: '1.7',
+                userSelect: 'text',
+                overflowY: 'auto',
+                flex: 1
+              }}
+            >
+              {compilarTexto(modalNota.txt, modalNota.c)}
             </div>
 
-            <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ color: '#94A3B8', fontSize: '0.85rem' }}>
-                Arraste o mouse no trecho desejado e copie manualmente (Ctrl+C).
-              </div>
-              <button onClick={() => setModalMascara(null)} style={{ padding: '8px 18px', borderRadius: '6px', border: 'none', background: 'var(--ev-teal-primary)', color: '#FFF', fontWeight: '700', cursor: 'pointer' }}>Concluído</button>
+            {/* BARRA DE AÇÕES INFERIOR MINIMALISTA */}
+            <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(compilarTexto(modalNota.txt, modalNota.c));
+                  setToast({ visivel: true, mensagem: `📋 Texto completo de "${modalNota.t}" copiado!` });
+                  setTimeout(() => setToast({ visivel: false, mensagem: '' }), 2500);
+                }}
+                style={{
+                  padding: '8px 20px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: 'var(--ev-teal-primary)',
+                  color: '#FFF',
+                  fontWeight: '700',
+                  cursor: 'pointer'
+                }}
+              >
+                Copiar Tudo
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* MODAL DO SUPERVISOR (CRIAR/EDITAR) */}
+      {/* MODAL SUPERVISOR (CRIAR/EDITAR) */}
       {modalAberto && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 30, 30, 0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 30, 30, 0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1300, padding: '20px' }}>
           <div style={{ background: '#FFFFFF', borderRadius: '16px', width: '100%', maxWidth: '560px', padding: '28px', boxShadow: 'var(--shadow-lg)' }}>
             <h3 style={{ margin: '0 0 16px 0', color: 'var(--ev-teal-dark)' }}>{formData.id ? '✏️ Editar Colinha' : '➕ Nova Colinha Operacional'}</h3>
             <form onSubmit={salvarColinha}>
@@ -629,9 +694,9 @@ export default function ColinhasBoard({ isSupervisor }) {
         </div>
       )}
 
-      {/* FEEDBACK FLUTUANTE (TOAST) */}
+      {/* FEEDBACK TOAST */}
       {toast.visivel && (
-        <div style={{ position: 'fixed', bottom: '24px', right: '24px', background: 'var(--ev-teal-dark)', color: '#FFFFFF', padding: '12px 22px', borderRadius: 'var(--radius-pill)', border: '1px solid var(--ev-turquoise)', zIndex: 1100, fontWeight: '700', boxShadow: 'var(--shadow-md)' }}>
+        <div style={{ position: 'fixed', bottom: '24px', right: '24px', background: 'var(--ev-teal-dark)', color: '#FFFFFF', padding: '12px 22px', borderRadius: 'var(--radius-pill)', border: '1px solid var(--ev-turquoise)', zIndex: 1400, fontWeight: '700', boxShadow: 'var(--shadow-md)' }}>
           {toast.mensagem}
         </div>
       )}

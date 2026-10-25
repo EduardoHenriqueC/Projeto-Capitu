@@ -93,7 +93,7 @@ export default function AppPrincipal() {
 
       {/* ÁREA DE CONTEÚDO */}
       <main style={{ flex: 1 }}>
-        {activeView === 'home' && <HomeView setView={setActiveView} />}
+        {activeView === 'home' && <HomeView isSupervisor={isSupervisor} />}
         {activeView === 'colinhas' && <ColinhasBoard isSupervisor={isSupervisor} />}
         {activeView === 'regulamentos' && <RegulamentosView />}
         {activeView === 'links' && <LinksView />}
