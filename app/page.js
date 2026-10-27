@@ -3,11 +3,44 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 
-// Importação de todas as telas do portal
+// Telas do sistema com os caminhos atualizados
 import HomeView from '../components/HomeView';
 import ColinhasBoard from '@/components/ColinhasBoard';
 import RegulamentosView from '@/components/RegulamentosView';
 import LinksView from '@/components/LinksView';
+
+// Estilização dedicada para cada papel (Admin, Supervisor e Operador)
+const obterEstiloPapel = (papel) => {
+  switch (papel) {
+    case 'admin':
+      return {
+        rotulo: '👑 Administrador',
+        corTexto: '#6D28D9',      // Roxo escuro
+        corAvatar: '#7C3AED',     // Roxo vibrante
+        fundoTag: '#F5F3FF',      // Fundo lilás suave
+        bordaTag: '#DDD6FE',      // Borda lilás
+        sombra: '0 0 12px rgba(124, 58, 237, 0.35)'
+      };
+    case 'supervisor':
+      return {
+        rotulo: '⭐ Supervisão EV',
+        corTexto: '#B45309',      // Âmbar escuro
+        corAvatar: '#D97706',     // Âmbar
+        fundoTag: '#FFFBEB',      // Fundo amarelo suave
+        bordaTag: '#FDE68A',      // Borda âmbar
+        sombra: 'none'
+      };
+    default: // operador
+      return {
+        rotulo: 'Operação EV',
+        corTexto: '#0F766E',      // Teal escuro
+        corAvatar: '#006968',     // Teal oficial EV
+        fundoTag: '#F0FDFA',      // Fundo verde água suave
+        bordaTag: '#CCFBF1',      // Borda verde água
+        sombra: 'none'
+      };
+  }
+};
 
 export default function Page() {
   const [view, setView] = useState('inicio');
@@ -47,14 +80,12 @@ export default function Page() {
           avatar: data.avatar_url
         });
 
-        // Se estiver com a senha provisória, obriga a alteração
         if (data.precisa_trocar_senha) {
           setModalPrimeiroAcesso(true);
         } else {
           setModalPrimeiroAcesso(false);
         }
       } else {
-        // Fallback básico caso não conste na tabela public.usuarios
         const nomePadrao = userAuth.email.split('@')[0].replace('.', ' ');
         const nomeFormatado = nomePadrao.charAt(0).toUpperCase() + nomePadrao.slice(1);
 
@@ -97,7 +128,7 @@ export default function Page() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // 3. AÇÃO DE LOGIN (USUÁRIO E SENHA)
+  // 3. LOGIN POR EMAIL E SENHA
   const handleLogin = async (e) => {
     e.preventDefault();
     setMsgErro('');
@@ -118,16 +149,17 @@ export default function Page() {
         setSenhaInput('');
       }
     } catch (err) {
-      setMsgErro(err.message === 'Invalid login credentials' 
-        ? 'E-mail ou senha incorretos.' 
-        : err.message
+      setMsgErro(
+        err.message === 'Invalid login credentials'
+          ? 'E-mail ou senha incorretos.'
+          : err.message
       );
     } finally {
       setEnviando(false);
     }
   };
 
-  // 4. AÇÃO DO PRIMEIRO ACESSO (GRAVAR NOVA SENHA CRIPTOGRAFADA)
+  // 4. PRIMEIRO ACESSO: ATUALIZAR SENHA CRIPTOGRAFADA
   const handleTrocarSenhaPrimeiroAcesso = async (e) => {
     e.preventDefault();
     setMsgErro('');
@@ -145,14 +177,14 @@ export default function Page() {
     setEnviando(true);
 
     try {
-      // 1. Altera a senha no motor de autenticação (criptografada em hash pelo Supabase)
+      // Atualiza a senha no motor de autenticação (hash bcrypt)
       const { error: erroAuth } = await supabase.auth.updateUser({
         password: novaSenha
       });
 
       if (erroAuth) throw erroAuth;
 
-      // 2. Marca na tabela que o usuário já redefiniu sua senha inicial
+      // Desativa a flag de troca obrigatória
       const { error: erroTabela } = await supabase
         .from('usuarios')
         .update({ precisa_trocar_senha: false })
@@ -176,6 +208,7 @@ export default function Page() {
     await supabase.auth.signOut();
   };
 
+  // Admin possui todas as permissões concedidas à Supervisão
   const isSupervisor = role === 'supervisor' || role === 'admin';
 
   return (
@@ -231,58 +264,76 @@ export default function Page() {
           ))}
         </nav>
 
-        {/* ÁREA DE PERFIL OU BOTÃO DE LOGIN */}
+        {/* ÁREA DE PERFIL / LOGIN */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
           {carregandoAuth ? (
             <span style={{ fontSize: '0.8rem', color: '#94A3B8' }}>Validando sessão...</span>
           ) : usuario ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{
-                width: '38px',
-                height: '38px',
-                borderRadius: '50%',
-                backgroundColor: isSupervisor ? '#D97706' : 'var(--ev-teal-primary)',
-                color: '#FFFFFF',
-                fontWeight: '800',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '0.88rem'
-              }}>
-                {usuario.nome ? usuario.nome.slice(0, 2).toUpperCase() : 'EV'}
-              </div>
+            (() => {
+              const estilo = obterEstiloPapel(role);
+              return (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  
+                  {/* AVATAR COM A COR E SOMBRA DO CARGO */}
+                  <div style={{
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '50%',
+                    backgroundColor: estilo.corAvatar,
+                    color: '#FFFFFF',
+                    fontWeight: '800',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '0.9rem',
+                    boxShadow: estilo.sombra
+                  }}>
+                    {usuario.nome ? usuario.nome.slice(0, 2).toUpperCase() : 'EV'}
+                  </div>
 
-              <div style={{ textAlign: 'left', lineHeight: '1.2' }}>
-                <div style={{ fontSize: '0.88rem', fontWeight: '800', color: 'var(--text-dark)' }}>
-                  {usuario.nome}
-                </div>
-                <div style={{
-                  fontSize: '0.72rem',
-                  fontWeight: '700',
-                  color: isSupervisor ? '#B45309' : '#0F766E'
-                }}>
-                  {isSupervisor ? '⭐ Supervisão EV' : 'Operação EV'}
-                </div>
-              </div>
+                  {/* NOME E TAG DO CARGO */}
+                  <div style={{ textAlign: 'left', lineHeight: '1.2' }}>
+                    <div style={{ fontSize: '0.9rem', fontWeight: '800', color: 'var(--text-dark)' }}>
+                      {usuario.nome}
+                    </div>
+                    
+                    <span style={{
+                      display: 'inline-block',
+                      marginTop: '3px',
+                      fontSize: '0.72rem',
+                      fontWeight: '800',
+                      color: estilo.corTexto,
+                      backgroundColor: estilo.fundoTag,
+                      border: `1px solid ${estilo.bordaTag}`,
+                      padding: '2px 8px',
+                      borderRadius: '9999px',
+                      letterSpacing: '0.3px'
+                    }}>
+                      {estilo.rotulo}
+                    </span>
+                  </div>
 
-              <button
-                onClick={handleLogout}
-                title="Sair do portal"
-                style={{
-                  background: '#F1F5F9',
-                  border: 'none',
-                  padding: '6px 12px',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontSize: '0.8rem',
-                  color: '#64748B',
-                  fontWeight: '700',
-                  marginLeft: '6px'
-                }}
-              >
-                Sair
-              </button>
-            </div>
+                  {/* BOTÃO SAIR */}
+                  <button
+                    onClick={handleLogout}
+                    title="Sair do portal"
+                    style={{
+                      background: '#F1F5F9',
+                      border: 'none',
+                      padding: '6px 12px',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontSize: '0.8rem',
+                      color: '#64748B',
+                      fontWeight: '700',
+                      marginLeft: '6px'
+                    }}
+                  >
+                    Sair
+                  </button>
+                </div>
+              );
+            })()
           ) : (
             <button
               onClick={() => {
@@ -310,7 +361,7 @@ export default function Page() {
         </div>
       </header>
 
-      {/* RENDERIZAÇÃO DAS TELAS */}
+      {/* RENDERIZAÇÃO DAS TELAS DO SISTEMA */}
       <main>
         {view === 'inicio' && (
           <HomeView
@@ -345,7 +396,7 @@ export default function Page() {
         )}
       </main>
 
-      {/* MODAL 1: LOGIN COM USUÁRIO E SENHA */}
+      {/* MODAL DE LOGIN (USUÁRIO E SENHA) */}
       {modalLoginAberto && (
         <div
           style={{
@@ -486,7 +537,7 @@ export default function Page() {
         </div>
       )}
 
-      {/* MODAL 2: FORÇAR TROCA DE SENHA NO PRIMEIRO ACESSO */}
+      {/* MODAL DE PRIMEIRO ACESSO (TROCA OBRIGATÓRIA DE SENHA) */}
       {modalPrimeiroAcesso && (
         <div
           style={{
