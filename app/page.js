@@ -2,15 +2,23 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+
+// Importação de todas as telas do portal
 import HomeView from '../components/HomeView';
+import ColinhasView from '../components/ColinhasView';
+import RegulamentosView from '../components/RegulamentosView';
+import LinksView from '../components/LinksView';
 
 export default function Page() {
+  // 1. ESTADO DE NAVEGAÇÃO ENTRE AS PÁGINAS
   const [view, setView] = useState('inicio');
+
+  // 2. ESTADOS DE AUTENTICAÇÃO E PERFIL (RBAC)
   const [usuario, setUsuario] = useState(null);
   const [role, setRole] = useState('operador');
   const [carregandoAuth, setCarregandoAuth] = useState(true);
 
-  // Estados do Modal de Login OTP
+  // Estados do Modal de Login por Código (OTP)
   const [modalLoginAberto, setModalLoginAberto] = useState(false);
   const [etapaLogin, setEtapaLogin] = useState('email'); // 'email' ou 'codigo'
   const [emailInput, setEmailInput] = useState('');
@@ -18,7 +26,7 @@ export default function Page() {
   const [enviandoAuth, setEnviandoAuth] = useState(false);
   const [msgErroAuth, setMsgErroAuth] = useState('');
 
-  // 1. Carrega dados e cargo do colaborador da tabela public.usuarios
+  // 3. CONSULTA O CARGO NA TABELA 'public.usuarios'
   const carregarPerfilUsuario = async (userAuth) => {
     try {
       const { data, error } = await supabase
@@ -35,7 +43,7 @@ export default function Page() {
           avatar: data.avatar_url
         });
       } else {
-        // Se ainda não existir registro na tabela, cria automaticamente
+        // Se for o primeiro acesso e ainda não estiver na tabela, cadastra como operador
         const nomePadrao = userAuth.email.split('@')[0].replace('.', ' ');
         const nomeFormatado = nomePadrao.charAt(0).toUpperCase() + nomePadrao.slice(1);
 
@@ -55,13 +63,13 @@ export default function Page() {
         });
       }
     } catch (err) {
-      console.error('Erro ao ler papel do usuário:', err);
+      console.error('Erro ao buscar perfil do usuário:', err);
     } finally {
       setCarregandoAuth(false);
     }
   };
 
-  // 2. Monitoramento de sessão ativa
+  // 4. MONITORAMENTO DA SESSÃO SUPABASE
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
@@ -85,7 +93,7 @@ export default function Page() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // 3. Disparo do código OTP para o e-mail
+  // 5. ENVIO DO CÓDIGO TEMPORÁRIO PARA O E-MAIL
   const handleEnviarCodigo = async (e) => {
     e.preventDefault();
     setMsgErroAuth('');
@@ -94,7 +102,6 @@ export default function Page() {
     try {
       const emailLimpo = emailInput.trim().toLowerCase();
 
-      // Envia o OTP via Supabase
       const { error } = await supabase.auth.signInWithOtp({
         email: emailLimpo,
         options: {
@@ -106,13 +113,13 @@ export default function Page() {
 
       setEtapaLogin('codigo');
     } catch (err) {
-      setMsgErroAuth(err.message || 'Falha ao enviar código. Verifique o e-mail digitado.');
+      setMsgErroAuth(err.message || 'Falha ao enviar o código. Verifique o e-mail digitado.');
     } finally {
       setEnviandoAuth(false);
     }
   };
 
-  // 4. Verificação do código de 6 dígitos
+  // 6. VALIDAÇÃO DO CÓDIGO (COMPATÍVEL COM ATÉ 8 DÍGITOS)
   const handleVerificarCodigo = async (e) => {
     e.preventDefault();
     setMsgErroAuth('');
@@ -144,7 +151,7 @@ export default function Page() {
     }
   };
 
-  // 5. Logout
+  // 7. LOGOUT
   const handleLogout = async () => {
     await supabase.auth.signOut();
   };
@@ -152,7 +159,8 @@ export default function Page() {
   const isSupervisor = role === 'supervisor' || role === 'admin';
 
   return (
-    <div>
+    <div style={{ minHeight: '100vh', backgroundColor: '#F8FAFC' }}>
+      
       {/* NAVBAR SUPERIOR */}
       <header style={{
         backgroundColor: '#FFFFFF',
@@ -166,13 +174,16 @@ export default function Page() {
         zIndex: 100
       }}>
         {/* LOGO */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div 
+          onClick={() => setView('inicio')}
+          style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}
+        >
           <div style={{ fontWeight: '900', fontSize: '1.28rem', color: 'var(--ev-teal-dark)' }}>
             📚 Portal Capitu
           </div>
         </div>
 
-        {/* NAVEGAÇÃO ENTRE TELAS */}
+        {/* NAVEGAÇÃO ENTRE AS PÁGINAS */}
         <nav style={{ display: 'flex', gap: '8px' }}>
           {[
             { id: 'inicio', label: 'Início', icone: '🏠' },
@@ -187,7 +198,7 @@ export default function Page() {
                 backgroundColor: view === item.id ? 'var(--ev-teal-primary)' : 'transparent',
                 color: view === item.id ? '#FFFFFF' : '#475569',
                 border: 'none',
-                padding: '8px 16px',
+                padding: '8px 18px',
                 borderRadius: '9999px',
                 fontWeight: '700',
                 fontSize: '0.86rem',
@@ -280,36 +291,40 @@ export default function Page() {
         </div>
       </header>
 
-      {/* VIEW PRINCIPAL DO SISTEMA */}
-      {view === 'inicio' && (
-        <HomeView
-          setView={setView}
-          isSupervisor={isSupervisor}
-          usuarioLogado={usuario}
-        />
-      )}
+      {/* RENDERIZAÇÃO CONDICIONAL DE TODAS AS TELAS */}
+      <main>
+        {view === 'inicio' && (
+          <HomeView
+            setView={setView}
+            isSupervisor={isSupervisor}
+            usuarioLogado={usuario}
+          />
+        )}
 
-      {view !== 'inicio' && (
-        <div style={{ textAlign: 'center', padding: '90px 20px', color: 'var(--text-muted)' }}>
-          <h2 style={{ fontSize: '1.8rem', color: 'var(--ev-teal-dark)' }}>Módulo {view.toUpperCase()} em estruturação</h2>
-          <p style={{ marginTop: '8px', fontSize: '0.95rem' }}>Em breve reuniremos os dados operacionais aqui.</p>
-          <button
-            onClick={() => setView('inicio')}
-            style={{
-              marginTop: '18px',
-              backgroundColor: 'var(--ev-teal-primary)',
-              color: '#FFF',
-              border: 'none',
-              padding: '10px 24px',
-              borderRadius: '9999px',
-              cursor: 'pointer',
-              fontWeight: '700'
-            }}
-          >
-            ← Voltar ao Início
-          </button>
-        </div>
-      )}
+        {view === 'colinhas' && (
+          <ColinhasView
+            setView={setView}
+            isSupervisor={isSupervisor}
+            usuarioLogado={usuario}
+          />
+        )}
+
+        {view === 'regulamentos' && (
+          <RegulamentosView
+            setView={setView}
+            isSupervisor={isSupervisor}
+            usuarioLogado={usuario}
+          />
+        )}
+
+        {view === 'links' && (
+          <LinksView
+            setView={setView}
+            isSupervisor={isSupervisor}
+            usuarioLogado={usuario}
+          />
+        )}
+      </main>
 
       {/* MODAL DE LOGIN VIA CÓDIGO (OTP) */}
       {modalLoginAberto && (
@@ -369,7 +384,7 @@ export default function Page() {
               <p style={{ margin: '6px 0 0 0', fontSize: '0.85rem', color: '#64748B' }}>
                 {etapaLogin === 'email'
                   ? 'Informe seu e-mail institucional para receber o código temporário.'
-                  : `Digite o código de 6 dígitos que enviamos para ${emailInput}.`}
+                  : `Digite o código enviado para ${emailInput}.`}
               </p>
             </div>
 
@@ -388,7 +403,7 @@ export default function Page() {
               </div>
             )}
 
-            {/* ETAPA 1: DIGITAR E-MAIL */}
+            {/* ETAPA 1: INFORMAR E-MAIL */}
             {etapaLogin === 'email' && (
               <form onSubmit={handleEnviarCodigo} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 <div>
@@ -433,18 +448,18 @@ export default function Page() {
               </form>
             )}
 
-            {/* ETAPA 2: DIGITAR CÓDIGO RECEBIDO */}
+            {/* ETAPA 2: DIGITAR CÓDIGO (ATÉ 8 DÍGITOS) */}
             {etapaLogin === 'codigo' && (
               <form onSubmit={handleVerificarCodigo} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', marginBottom: '6px', color: '#334155' }}>
-                    Código de 6 dígitos:
+                    Código de acesso:
                   </label>
                   <input
                     type="text"
                     required
-                    maxLength={6}
-                    placeholder="123456"
+                    maxLength={8}
+                    placeholder="12345678"
                     value={codigoInput}
                     onChange={(e) => setCodigoInput(e.target.value)}
                     style={{
@@ -454,7 +469,7 @@ export default function Page() {
                       border: '1.5px solid #CBD5E1',
                       fontSize: '1.3rem',
                       textAlign: 'center',
-                      letterSpacing: '6px',
+                      letterSpacing: '5px',
                       fontWeight: '800',
                       outline: 'none'
                     }}
