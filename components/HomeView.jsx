@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase'; // Importação do cliente configurado
+import { supabase } from '../lib/supabase';
 
 export default function HomeView({ setView, isSupervisor }) {
+  // 1. ESTADOS DO COMPONENTE (TODOS NO TOPO)
   const [filtroAvisos, setFiltroAvisos] = useState('todos');
   const [modalAviso, setModalAviso] = useState(null);
   const [modalPublicar, setModalPublicar] = useState(false);
@@ -11,7 +12,17 @@ export default function HomeView({ setView, isSupervisor }) {
   const [avisos, setAvisos] = useState([]);
   const [toast, setToast] = useState({ visivel: false, mensagem: '' });
 
-  // 1. Buscar avisos do Supabase
+  // Estado do formulário de publicação
+  const [formNovo, setFormNovo] = useState({
+    titulo: '',
+    tagSetor: 'TI/Financeiro',
+    tipo: 'urgente',
+    statusExtra: '✓ SOLUCIONADO',
+    fixado: false,
+    descricao: ''
+  });
+
+  // 2. FUNÇÃO PARA CARREGAR OS AVISOS DO SUPABASE
   const buscarAvisos = async () => {
     try {
       setCarregando(true);
@@ -24,7 +35,6 @@ export default function HomeView({ setView, isSupervisor }) {
       if (error) throw error;
 
       if (data) {
-        // Mapeia do formato do banco para o layout visual dos cards
         const formatados = data.map((item) => {
           const hora = new Date(item.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
           const badges = [
@@ -76,7 +86,7 @@ export default function HomeView({ setView, isSupervisor }) {
   useEffect(() => {
     buscarAvisos();
 
-    // Inscrição em tempo real (atualiza a tela de todos automaticamente ao publicar)
+    // Sincronização em tempo real (Realtime)
     const canal = supabase
       .channel('avisos_realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'avisos_mural' }, () => {
@@ -89,7 +99,7 @@ export default function HomeView({ setView, isSupervisor }) {
     };
   }, []);
 
-// 2. Formulário de Novo Comunicado
+  // 3. AÇÕES DO SUPERVISOR (PUBLICAR E EXCLUIR)
   const handleSalvarAviso = async (e) => {
     e.preventDefault();
     if (!formNovo.titulo.trim() || !formNovo.descricao.trim()) return;
@@ -109,7 +119,6 @@ export default function HomeView({ setView, isSupervisor }) {
 
       if (error) throw error;
 
-      // ATUALIZAÇÃO IMEDIATA: recarrega os dados do banco na tela na mesma hora
       await buscarAvisos();
 
       setModalPublicar(false);
@@ -129,7 +138,6 @@ export default function HomeView({ setView, isSupervisor }) {
     }
   };
 
-  // 3. Excluir comunicado no Supabase
   const handleExcluirAviso = async (e, id) => {
     e.stopPropagation();
     if (!window.confirm('Tem certeza de que deseja remover este comunicado?')) return;
@@ -138,7 +146,6 @@ export default function HomeView({ setView, isSupervisor }) {
       const { error } = await supabase.from('avisos_mural').delete().eq('id', id);
       if (error) throw error;
 
-      // ATUALIZAÇÃO IMEDIATA após deletar
       await buscarAvisos();
 
       if (modalAviso?.id === id) setModalAviso(null);
@@ -149,6 +156,7 @@ export default function HomeView({ setView, isSupervisor }) {
     }
   };
 
+  // 4. FILTRAGEM
   const avisosFiltrados = avisos.filter((aviso) => {
     if (filtroAvisos === 'urgentes') return aviso.tipo === 'urgente';
     if (filtroAvisos === 'fixados') return aviso.fixado;
@@ -267,7 +275,7 @@ export default function HomeView({ setView, isSupervisor }) {
         }
       `}</style>
 
-      {/* BANNER PRINCIPAL HERO */}
+      {/* BANNER PRINCIPAL */}
       <div style={{
         background: 'linear-gradient(135deg, var(--ev-teal-dark) 0%, var(--ev-teal-primary) 70%, #017B79 100%)',
         color: '#FFFFFF',
@@ -369,7 +377,7 @@ export default function HomeView({ setView, isSupervisor }) {
         {/* CONTAINER DO MURAL COM ILUSTRAÇÕES DECORATIVAS NAS LATERAIS */}
         <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           
-          {/* ILUSTRAÇÃO LATERAL ESQUERDA: ESTANTE & LIVROS */}
+          {/* ILUSTRAÇÃO LATERAL ESQUERDA */}
           <div className="mural-book-decor" style={{ position: 'absolute', left: '0px', top: '50%', transform: 'translateY(-50%)', width: '135px', pointerEvents: 'none', zIndex: 1 }}>
             <svg width="135" height="260" viewBox="0 0 135 260" fill="none" stroke="#8A7B68" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="12" y1="20" x2="12" y2="250" strokeWidth="2.2" />
@@ -455,7 +463,7 @@ export default function HomeView({ setView, isSupervisor }) {
             )}
           </div>
 
-          {/* ILUSTRAÇÃO LATERAL DIREITA: TORRE DE LIVROS EMPILHADOS */}
+          {/* ILUSTRAÇÃO LATERAL DIREITA: TORRE DE LIVROS */}
           <div className="mural-book-decor" style={{ position: 'absolute', right: '-15px', top: '50%', transform: 'translateY(-50%)', width: '150px', pointerEvents: 'none', zIndex: 1 }}>
             <svg width="150" height="260" viewBox="0 0 150 260" fill="none" stroke="#8A7B68" strokeWidth="2.2" strokeLinejoin="round" strokeLinecap="round">
               <g transform="translate(10, 30)">
@@ -517,7 +525,7 @@ export default function HomeView({ setView, isSupervisor }) {
         </div>
       </div>
 
-      {/* MODAL AMPLIADO DE LEITURA DO AVISO */}
+      {/* MODAL DE LEITURA COMPLETA */}
       {modalAviso && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 30, 30, 0.65)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1300, padding: '24px' }} onClick={() => setModalAviso(null)}>
           <div className="mural-modal-box" style={{ backgroundColor: modalAviso.fundo, borderColor: modalAviso.borda }} onClick={(e) => e.stopPropagation()}>
@@ -591,7 +599,7 @@ export default function HomeView({ setView, isSupervisor }) {
         </div>
       )}
 
-      {/* MODAL DE PUBLICAR COMUNICADO (ACESSO SUPERVISOR) */}
+      {/* MODAL DE PUBLICAR (LÍDER) */}
       {modalPublicar && isSupervisor && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 30, 30, 0.65)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1400, padding: '20px' }} onClick={() => setModalPublicar(false)}>
           <div style={{ backgroundColor: '#FFFFFF', borderRadius: '20px', padding: '32px 36px', width: '100%', maxWidth: '640px', boxShadow: '0 25px 50px rgba(0, 30, 30, 0.25)', border: '2px solid var(--border-subtle)' }} onClick={(e) => e.stopPropagation()}>
@@ -664,7 +672,7 @@ export default function HomeView({ setView, isSupervisor }) {
 
       {/* TOAST DE FEEDBACK FLUTUANTE */}
       {toast.visivel && (
-        <div style={{ position: 'fixed', bottom: '24px', right: '24px', background: 'var(--ev-teal-dark)', color: '#FFFFFF', padding: '12px 22px', borderRadius: 'var(--radius-pill)', border: '1px solid var(--ev-turquoise)', zIndex: 1500, fontWeight: '700', boxShadow: 'var(--shadow-md)' }}>
+        <div style={{ position: 'fixed', bottom: '24px', right: '24px', background: 'var(--ev-teal-dark)', color: '#FFFFFF', padding: '12px 22px', borderRadius: '9999px', border: '1px solid var(--ev-turquoise)', zIndex: 1500, fontWeight: '700', boxShadow: '0 6px 16px rgba(0, 50, 50, 0.25)' }}>
           {toast.mensagem}
         </div>
       )}
