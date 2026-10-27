@@ -89,16 +89,7 @@ export default function HomeView({ setView, isSupervisor }) {
     };
   }, []);
 
-  // 2. Formulário de Novo Comunicado
-  const [formNovo, setFormNovo] = useState({
-    titulo: '',
-    tagSetor: 'TI/Financeiro',
-    tipo: 'urgente',
-    statusExtra: '✓ SOLUCIONADO',
-    fixado: false,
-    descricao: ''
-  });
-
+// 2. Formulário de Novo Comunicado
   const handleSalvarAviso = async (e) => {
     e.preventDefault();
     if (!formNovo.titulo.trim() || !formNovo.descricao.trim()) return;
@@ -118,6 +109,9 @@ export default function HomeView({ setView, isSupervisor }) {
 
       if (error) throw error;
 
+      // ATUALIZAÇÃO IMEDIATA: recarrega os dados do banco na tela na mesma hora
+      await buscarAvisos();
+
       setModalPublicar(false);
       setFormNovo({
         titulo: '',
@@ -128,7 +122,7 @@ export default function HomeView({ setView, isSupervisor }) {
         descricao: ''
       });
 
-      setToast({ visivel: true, mensagem: '📢 Comunicado salvo no banco de dados!' });
+      setToast({ visivel: true, mensagem: '📢 Comunicado publicado no mural!' });
       setTimeout(() => setToast({ visivel: false, mensagem: '' }), 2600);
     } catch (err) {
       alert('Erro ao publicar: ' + err.message);
@@ -143,6 +137,9 @@ export default function HomeView({ setView, isSupervisor }) {
     try {
       const { error } = await supabase.from('avisos_mural').delete().eq('id', id);
       if (error) throw error;
+
+      // ATUALIZAÇÃO IMEDIATA após deletar
+      await buscarAvisos();
 
       if (modalAviso?.id === id) setModalAviso(null);
       setToast({ visivel: true, mensagem: '🗑️ Comunicado removido com sucesso!' });
