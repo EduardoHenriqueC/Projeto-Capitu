@@ -5,9 +5,9 @@ import { supabase } from '../lib/supabase';
 
 // Importação de todas as telas do portal
 import HomeView from '../components/HomeView';
-import ColinhasView from '../components/ColinhasView';
-import RegulamentosView from '../components/RegulamentosView';
-import LinksView from '../components/LinksView';
+import ColinhasBoard from '@/components/ColinhasBoard';
+import RegulamentosView from '@/components/RegulamentosView';
+import LinksView from '@/components/LinksView';
 
 export default function Page() {
   // 1. ESTADO DE NAVEGAÇÃO ENTRE AS PÁGINAS
@@ -302,7 +302,7 @@ export default function Page() {
         )}
 
         {view === 'colinhas' && (
-          <ColinhasView
+          <ColinhasBoard
             setView={setView}
             isSupervisor={isSupervisor}
             usuarioLogado={usuario}
