@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase'; // Importação do cliente configurado
+import { supabase } from '../lib/lib/supabase'; // Importação do cliente configurado
 
 export default function HomeView({ setView, isSupervisor }) {
   const [filtroAvisos, setFiltroAvisos] = useState('todos');
