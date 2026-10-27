@@ -10,50 +10,53 @@ import RegulamentosView from '@/components/RegulamentosView';
 import LinksView from '@/components/LinksView';
 
 export default function Page() {
-  // 1. ESTADO DE NAVEGAÇÃO ENTRE AS PÁGINAS
   const [view, setView] = useState('inicio');
-
-  // 2. ESTADOS DE AUTENTICAÇÃO E PERFIL (RBAC)
   const [usuario, setUsuario] = useState(null);
   const [role, setRole] = useState('operador');
   const [carregandoAuth, setCarregandoAuth] = useState(true);
 
-  // Estados do Modal de Login por Código (OTP)
+  // Estados dos Modais
   const [modalLoginAberto, setModalLoginAberto] = useState(false);
-  const [etapaLogin, setEtapaLogin] = useState('email'); // 'email' ou 'codigo'
-  const [emailInput, setEmailInput] = useState('');
-  const [codigoInput, setCodigoInput] = useState('');
-  const [enviandoAuth, setEnviandoAuth] = useState(false);
-  const [msgErroAuth, setMsgErroAuth] = useState('');
+  const [modalPrimeiroAcesso, setModalPrimeiroAcesso] = useState(false);
 
-  // 3. CONSULTA O CARGO NA TABELA 'public.usuarios'
+  // Formulário de Login
+  const [emailInput, setEmailInput] = useState('');
+  const [senhaInput, setSenhaInput] = useState('');
+
+  // Formulário de Nova Senha (Primeiro Acesso)
+  const [novaSenha, setNovaSenha] = useState('');
+  const [confirmaSenha, setConfirmaSenha] = useState('');
+
+  const [enviando, setEnviando] = useState(false);
+  const [msgErro, setMsgErro] = useState('');
+
+  // 1. CARREGA O PERFIL E CHECA SE PRECISA TROCAR A SENHA
   const carregarPerfilUsuario = async (userAuth) => {
     try {
       const { data, error } = await supabase
         .from('usuarios')
-        .select('nome, email, avatar_url, role')
+        .select('nome, email, avatar_url, role, precisa_trocar_senha')
         .eq('email', userAuth.email)
         .single();
 
       if (data) {
-        setRole(data.role); // 'operador', 'supervisor' ou 'admin'
+        setRole(data.role);
         setUsuario({
           email: data.email,
           nome: data.nome,
           avatar: data.avatar_url
         });
+
+        // Se estiver com a senha provisória, obriga a alteração
+        if (data.precisa_trocar_senha) {
+          setModalPrimeiroAcesso(true);
+        } else {
+          setModalPrimeiroAcesso(false);
+        }
       } else {
-        // Se for o primeiro acesso e ainda não estiver na tabela, cadastra como operador
+        // Fallback básico caso não conste na tabela public.usuarios
         const nomePadrao = userAuth.email.split('@')[0].replace('.', ' ');
         const nomeFormatado = nomePadrao.charAt(0).toUpperCase() + nomePadrao.slice(1);
-
-        await supabase.from('usuarios').insert([
-          {
-            email: userAuth.email,
-            nome: nomeFormatado,
-            role: 'operador'
-          }
-        ]);
 
         setRole('operador');
         setUsuario({
@@ -63,13 +66,13 @@ export default function Page() {
         });
       }
     } catch (err) {
-      console.error('Erro ao buscar perfil do usuário:', err);
+      console.error('Erro ao ler perfil do usuário:', err);
     } finally {
       setCarregandoAuth(false);
     }
   };
 
-  // 4. MONITORAMENTO DA SESSÃO SUPABASE
+  // 2. MONITORAMENTO DE SESSÃO
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
@@ -86,6 +89,7 @@ export default function Page() {
       } else {
         setUsuario(null);
         setRole('operador');
+        setModalPrimeiroAcesso(false);
         setCarregandoAuth(false);
       }
     });
@@ -93,46 +97,16 @@ export default function Page() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // 5. ENVIO DO CÓDIGO TEMPORÁRIO PARA O E-MAIL
-  const handleEnviarCodigo = async (e) => {
+  // 3. AÇÃO DE LOGIN (USUÁRIO E SENHA)
+  const handleLogin = async (e) => {
     e.preventDefault();
-    setMsgErroAuth('');
-    setEnviandoAuth(true);
+    setMsgErro('');
+    setEnviando(true);
 
     try {
-      const emailLimpo = emailInput.trim().toLowerCase();
-
-      const { error } = await supabase.auth.signInWithOtp({
-        email: emailLimpo,
-        options: {
-          shouldCreateUser: true
-        }
-      });
-
-      if (error) throw error;
-
-      setEtapaLogin('codigo');
-    } catch (err) {
-      setMsgErroAuth(err.message || 'Falha ao enviar o código. Verifique o e-mail digitado.');
-    } finally {
-      setEnviandoAuth(false);
-    }
-  };
-
-  // 6. VALIDAÇÃO DO CÓDIGO (COMPATÍVEL COM ATÉ 8 DÍGITOS)
-  const handleVerificarCodigo = async (e) => {
-    e.preventDefault();
-    setMsgErroAuth('');
-    setEnviandoAuth(true);
-
-    try {
-      const emailLimpo = emailInput.trim().toLowerCase();
-      const tokenLimpo = codigoInput.trim();
-
-      const { data, error } = await supabase.auth.verifyOtp({
-        email: emailLimpo,
-        token: tokenLimpo,
-        type: 'email'
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: emailInput.trim().toLowerCase(),
+        password: senhaInput
       });
 
       if (error) throw error;
@@ -140,18 +114,64 @@ export default function Page() {
       if (data?.user) {
         await carregarPerfilUsuario(data.user);
         setModalLoginAberto(false);
-        setEtapaLogin('email');
         setEmailInput('');
-        setCodigoInput('');
+        setSenhaInput('');
       }
     } catch (err) {
-      setMsgErroAuth('Código inválido ou expirado. Tente novamente.');
+      setMsgErro(err.message === 'Invalid login credentials' 
+        ? 'E-mail ou senha incorretos.' 
+        : err.message
+      );
     } finally {
-      setEnviandoAuth(false);
+      setEnviando(false);
     }
   };
 
-  // 7. LOGOUT
+  // 4. AÇÃO DO PRIMEIRO ACESSO (GRAVAR NOVA SENHA CRIPTOGRAFADA)
+  const handleTrocarSenhaPrimeiroAcesso = async (e) => {
+    e.preventDefault();
+    setMsgErro('');
+
+    if (novaSenha.length < 6) {
+      setMsgErro('A nova senha deve ter no mínimo 6 caracteres.');
+      return;
+    }
+
+    if (novaSenha !== confirmaSenha) {
+      setMsgErro('As senhas digitadas não coincidem.');
+      return;
+    }
+
+    setEnviando(true);
+
+    try {
+      // 1. Altera a senha no motor de autenticação (criptografada em hash pelo Supabase)
+      const { error: erroAuth } = await supabase.auth.updateUser({
+        password: novaSenha
+      });
+
+      if (erroAuth) throw erroAuth;
+
+      // 2. Marca na tabela que o usuário já redefiniu sua senha inicial
+      const { error: erroTabela } = await supabase
+        .from('usuarios')
+        .update({ precisa_trocar_senha: false })
+        .eq('email', usuario.email);
+
+      if (erroTabela) throw erroTabela;
+
+      alert('Senha cadastrada com sucesso! Bem-vindo(a) ao Portal Capitu.');
+      setModalPrimeiroAcesso(false);
+      setNovaSenha('');
+      setConfirmaSenha('');
+    } catch (err) {
+      setMsgErro('Erro ao atualizar senha: ' + err.message);
+    } finally {
+      setEnviando(false);
+    }
+  };
+
+  // 5. LOGOUT
   const handleLogout = async () => {
     await supabase.auth.signOut();
   };
@@ -214,7 +234,7 @@ export default function Page() {
         {/* ÁREA DE PERFIL OU BOTÃO DE LOGIN */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
           {carregandoAuth ? (
-            <span style={{ fontSize: '0.8rem', color: '#94A3B8' }}>Validando acesso...</span>
+            <span style={{ fontSize: '0.8rem', color: '#94A3B8' }}>Validando sessão...</span>
           ) : usuario ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <div style={{
@@ -247,7 +267,7 @@ export default function Page() {
 
               <button
                 onClick={handleLogout}
-                title="Desconectar do portal"
+                title="Sair do portal"
                 style={{
                   background: '#F1F5F9',
                   border: 'none',
@@ -267,8 +287,7 @@ export default function Page() {
             <button
               onClick={() => {
                 setModalLoginAberto(true);
-                setEtapaLogin('email');
-                setMsgErroAuth('');
+                setMsgErro('');
               }}
               style={{
                 backgroundColor: 'var(--ev-teal-primary)',
@@ -291,7 +310,7 @@ export default function Page() {
         </div>
       </header>
 
-      {/* RENDERIZAÇÃO CONDICIONAL DE TODAS AS TELAS */}
+      {/* RENDERIZAÇÃO DAS TELAS */}
       <main>
         {view === 'inicio' && (
           <HomeView
@@ -326,7 +345,7 @@ export default function Page() {
         )}
       </main>
 
-      {/* MODAL DE LOGIN VIA CÓDIGO (OTP) */}
+      {/* MODAL 1: LOGIN COM USUÁRIO E SENHA */}
       {modalLoginAberto && (
         <div
           style={{
@@ -351,7 +370,7 @@ export default function Page() {
               borderRadius: '20px',
               padding: '32px 36px',
               width: '100%',
-              maxWidth: '440px',
+              maxWidth: '420px',
               boxShadow: '0 25px 50px rgba(0, 30, 30, 0.25)',
               position: 'relative'
             }}
@@ -376,19 +395,17 @@ export default function Page() {
               ✕
             </button>
 
-            <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-              <div style={{ fontSize: '2.4rem', marginBottom: '8px' }}>🔐</div>
+            <div style={{ textAlign: 'center', marginBottom: '22px' }}>
+              <div style={{ fontSize: '2.4rem', marginBottom: '6px' }}>🔑</div>
               <h3 style={{ margin: 0, fontSize: '1.4rem', fontWeight: '800', color: 'var(--ev-teal-dark)' }}>
-                {etapaLogin === 'email' ? 'Acesso ao Portal Capitu' : 'Confirme seu Código'}
+                Acesso Operacional
               </h3>
               <p style={{ margin: '6px 0 0 0', fontSize: '0.85rem', color: '#64748B' }}>
-                {etapaLogin === 'email'
-                  ? 'Informe seu e-mail institucional para receber o código temporário.'
-                  : `Digite o código enviado para ${emailInput}.`}
+                Entre com seu e-mail e senha corporativos.
               </p>
             </div>
 
-            {msgErroAuth && (
+            {msgErro && (
               <div style={{
                 backgroundColor: '#FEE2E2',
                 color: '#991B1B',
@@ -399,125 +416,197 @@ export default function Page() {
                 marginBottom: '16px',
                 textAlign: 'center'
               }}>
-                {msgErroAuth}
+                {msgErro}
               </div>
             )}
 
-            {/* ETAPA 1: INFORMAR E-MAIL */}
-            {etapaLogin === 'email' && (
-              <form onSubmit={handleEnviarCodigo} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', marginBottom: '6px', color: '#334155' }}>
-                    E-mail institucional:
-                  </label>
-                  <input
-                    type="email"
-                    required
-                    placeholder="seu_nome@magazineluiza.com.br"
-                    value={emailInput}
-                    onChange={(e) => setEmailInput(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '12px 14px',
-                      borderRadius: '8px',
-                      border: '1.5px solid #CBD5E1',
-                      fontSize: '0.92rem',
-                      outline: 'none'
-                    }}
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={enviandoAuth}
+            <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', marginBottom: '6px', color: '#334155' }}>
+                  E-mail institucional:
+                </label>
+                <input
+                  type="email"
+                  required
+                  placeholder="seu_nome@magazineluiza.com.br"
+                  value={emailInput}
+                  onChange={(e) => setEmailInput(e.target.value)}
                   style={{
-                    backgroundColor: 'var(--ev-teal-primary)',
-                    color: '#FFFFFF',
-                    border: 'none',
-                    padding: '12px',
+                    width: '100%',
+                    padding: '10px 14px',
                     borderRadius: '8px',
-                    fontSize: '0.95rem',
-                    fontWeight: '800',
-                    cursor: enviandoAuth ? 'not-allowed' : 'pointer',
-                    marginTop: '8px',
-                    opacity: enviandoAuth ? 0.7 : 1
+                    border: '1.5px solid #CBD5E1',
+                    fontSize: '0.92rem',
+                    outline: 'none'
                   }}
-                >
-                  {enviandoAuth ? 'Enviando código...' : 'Receber Código de Acesso →'}
-                </button>
-              </form>
-            )}
+                />
+              </div>
 
-            {/* ETAPA 2: DIGITAR CÓDIGO (ATÉ 8 DÍGITOS) */}
-            {etapaLogin === 'codigo' && (
-              <form onSubmit={handleVerificarCodigo} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', marginBottom: '6px', color: '#334155' }}>
-                    Código de acesso:
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    maxLength={8}
-                    placeholder="12345678"
-                    value={codigoInput}
-                    onChange={(e) => setCodigoInput(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '12px 14px',
-                      borderRadius: '8px',
-                      border: '1.5px solid #CBD5E1',
-                      fontSize: '1.3rem',
-                      textAlign: 'center',
-                      letterSpacing: '5px',
-                      fontWeight: '800',
-                      outline: 'none'
-                    }}
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={enviandoAuth}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', marginBottom: '6px', color: '#334155' }}>
+                  Senha:
+                </label>
+                <input
+                  type="password"
+                  required
+                  placeholder="••••••••"
+                  value={senhaInput}
+                  onChange={(e) => setSenhaInput(e.target.value)}
                   style={{
-                    backgroundColor: 'var(--ev-teal-primary)',
-                    color: '#FFFFFF',
-                    border: 'none',
-                    padding: '12px',
+                    width: '100%',
+                    padding: '10px 14px',
                     borderRadius: '8px',
-                    fontSize: '0.95rem',
-                    fontWeight: '800',
-                    cursor: enviandoAuth ? 'not-allowed' : 'pointer',
-                    marginTop: '8px',
-                    opacity: enviandoAuth ? 0.7 : 1
+                    border: '1.5px solid #CBD5E1',
+                    fontSize: '0.92rem',
+                    outline: 'none'
                   }}
-                >
-                  {enviandoAuth ? 'Validando...' : 'Confirmar e Entrar'}
-                </button>
+                />
+              </div>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEtapaLogin('email');
-                    setMsgErroAuth('');
-                  }}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: '#64748B',
-                    fontSize: '0.8rem',
-                    cursor: 'pointer',
-                    textDecoration: 'underline',
-                    marginTop: '4px'
-                  }}
-                >
-                  Voltar e alterar e-mail
-                </button>
-              </form>
-            )}
+              <button
+                type="submit"
+                disabled={enviando}
+                style={{
+                  backgroundColor: 'var(--ev-teal-primary)',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  padding: '12px',
+                  borderRadius: '8px',
+                  fontSize: '0.95rem',
+                  fontWeight: '800',
+                  cursor: enviando ? 'not-allowed' : 'pointer',
+                  marginTop: '8px',
+                  opacity: enviando ? 0.7 : 1
+                }}
+              >
+                {enviando ? 'Entrando...' : 'Entrar no Portal'}
+              </button>
+            </form>
           </div>
         </div>
       )}
+
+      {/* MODAL 2: FORÇAR TROCA DE SENHA NO PRIMEIRO ACESSO */}
+      {modalPrimeiroAcesso && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 20, 20, 0.85)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 3000,
+            padding: '20px'
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '20px',
+              padding: '36px 40px',
+              width: '100%',
+              maxWidth: '460px',
+              boxShadow: '0 25px 60px rgba(0, 0, 0, 0.35)',
+              position: 'relative'
+            }}
+          >
+            <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+              <div style={{ fontSize: '2.6rem', marginBottom: '8px' }}>🛡️</div>
+              <h3 style={{ margin: 0, fontSize: '1.45rem', fontWeight: '800', color: 'var(--ev-teal-dark)' }}>
+                Primeiro Acesso: Nova Senha
+              </h3>
+              <p style={{ margin: '8px 0 0 0', fontSize: '0.86rem', color: '#64748B', lineHeight: '1.5' }}>
+                Você está utilizando uma senha temporária. Por segurança, defina sua senha definitiva para continuar.
+              </p>
+            </div>
+
+            {msgErro && (
+              <div style={{
+                backgroundColor: '#FEE2E2',
+                color: '#991B1B',
+                padding: '10px 14px',
+                borderRadius: '8px',
+                fontSize: '0.82rem',
+                fontWeight: '600',
+                marginBottom: '16px',
+                textAlign: 'center'
+              }}>
+                {msgErro}
+              </div>
+            )}
+
+            <form onSubmit={handleTrocarSenhaPrimeiroAcesso} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', marginBottom: '6px', color: '#334155' }}>
+                  Nova senha (mínimo 6 caracteres):
+                </label>
+                <input
+                  type="password"
+                  required
+                  placeholder="Digite sua nova senha"
+                  value={novaSenha}
+                  onChange={(e) => setNovaSenha(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '11px 14px',
+                    borderRadius: '8px',
+                    border: '1.5px solid #CBD5E1',
+                    fontSize: '0.92rem',
+                    outline: 'none'
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', marginBottom: '6px', color: '#334155' }}>
+                  Confirme a nova senha:
+                </label>
+                <input
+                  type="password"
+                  required
+                  placeholder="Repita a nova senha"
+                  value={confirmaSenha}
+                  onChange={(e) => setConfirmaSenha(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '11px 14px',
+                    borderRadius: '8px',
+                    border: '1.5px solid #CBD5E1',
+                    fontSize: '0.92rem',
+                    outline: 'none'
+                  }}
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={enviando}
+                style={{
+                  backgroundColor: 'var(--ev-teal-primary)',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  padding: '13px',
+                  borderRadius: '8px',
+                  fontSize: '0.95rem',
+                  fontWeight: '800',
+                  cursor: enviando ? 'not-allowed' : 'pointer',
+                  marginTop: '10px',
+                  boxShadow: '0 4px 12px rgba(0, 105, 104, 0.25)',
+                  opacity: enviando ? 0.7 : 1
+                }}
+              >
+                {enviando ? 'Criptografando e salvando...' : 'Salvar Nova Senha e Acessar'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
