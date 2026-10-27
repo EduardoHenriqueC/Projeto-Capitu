@@ -1,70 +1,95 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabase'; // Importação do cliente configurado
 
 export default function HomeView({ setView, isSupervisor }) {
   const [filtroAvisos, setFiltroAvisos] = useState('todos');
   const [modalAviso, setModalAviso] = useState(null);
   const [modalPublicar, setModalPublicar] = useState(false);
+  const [carregando, setCarregando] = useState(true);
+  const [avisos, setAvisos] = useState([]);
   const [toast, setToast] = useState({ visivel: false, mensagem: '' });
 
-  // Avisos iniciais de exemplo
-  const avisosIniciais = [
-    {
-      id: 1,
-      tipo: 'urgente',
-      fixado: false,
-      tagSetor: 'TI/Financeiro',
-      corRibbon: '#E05A36',
-      corRibbonSombra: '#B23A1A',
-      tagBg: '#FEF3C7',
-      tagColor: '#92400E',
-      badgeStatus: [
-        { rotulo: 'URGENTE', bg: '#FEE2E2', cor: '#991B1B' },
-        { rotulo: '✓ SOLUCIONADO', bg: '#DCFCE7', cor: '#166534' }
-      ],
-      titulo: 'Normalização: Gateway de Pagamentos PIX',
-      meta: 'Publicado hoje às 09:00 • Supervisão EV • TI/Financeiro',
-      descricao: 'A oscilação temporária no processamento de pagamentos via PIX foi completamente solucionada pelo gateway parceiro. Todos os pedidos anteriormente retidos já foram liberados para separação pelos livreiros. Não há necessidade de abertura de incidentes de TI. Utilize a colinha de atraso se necessário.',
-      borda: '#F59E0B',
-      fundo: '#FFFDF9'
-    },
-    {
-      id: 2,
-      tipo: 'informativo',
-      fixado: true,
-      tagSetor: 'Logística',
-      corRibbon: '#02807E',
-      corRibbonSombra: '#004D4C',
-      tagBg: '#CCFBF1',
-      tagColor: '#0F766E',
-      badgeStatus: [
-        { rotulo: 'INFORMATIVO', bg: '#E0F2FE', cor: '#0369A1' },
-        { rotulo: '📌 FIXADO', bg: '#E2E8F0', cor: '#334155' }
-      ],
-      titulo: 'Fluxo Postal e Prazos dos Correios',
-      meta: 'Informativo Permanente • Operação EV • Logística',
-      descricao: 'Lembrete operacional: O modal Impresso Normal com Registro Módico possui rastreamento simplificado (apenas postagem e saída para entrega). Não abrir P.I. antes do vencimento do prazo regulamentar exibido no sistema.',
-      borda: '#14B8A6',
-      fundo: '#F8FCFB'
-    }
-  ];
+  // 1. Buscar avisos do Supabase
+  const buscarAvisos = async () => {
+    try {
+      setCarregando(true);
+      const { data, error } = await supabase
+        .from('avisos_mural')
+        .select('*')
+        .order('fixado', { ascending: false })
+        .order('criado_em', { ascending: false });
 
-  const [avisos, setAvisos] = useState(avisosIniciais);
+      if (error) throw error;
 
-  // Carrega avisos salvos no localStorage ao montar o componente
-  useEffect(() => {
-    const salvos = localStorage.getItem('capitu_mural_avisos');
-    if (salvos) {
-      try {
-        setAvisos(JSON.parse(salvos));
-      } catch {
-        setAvisos(avisosIniciais);
+      if (data) {
+        // Mapeia do formato do banco para o layout visual dos cards
+        const formatados = data.map((item) => {
+          const hora = new Date(item.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+          const badges = [
+            {
+              rotulo: item.tipo === 'urgente' ? 'URGENTE' : 'INFORMATIVO',
+              bg: item.tipo === 'urgente' ? '#FEE2E2' : '#E0F2FE',
+              cor: item.tipo === 'urgente' ? '#991B1B' : '#0369A1'
+            }
+          ];
+
+          if (item.status_extra && item.status_extra !== 'Nenhum') {
+            badges.push({
+              rotulo: item.status_extra,
+              bg: item.status_extra === '✓ SOLUCIONADO' ? '#DCFCE7' : item.status_extra === '⏳ EM ANDAMENTO' ? '#FEF3C7' : '#F1F5F9',
+              cor: item.status_extra === '✓ SOLUCIONADO' ? '#166534' : item.status_extra === '⏳ EM ANDAMENTO' ? '#92400E' : '#334155'
+            });
+          }
+
+          if (item.fixado) {
+            badges.push({ rotulo: '📌 FIXADO', bg: '#E2E8F0', cor: '#334155' });
+          }
+
+          return {
+            id: item.id,
+            tipo: item.tipo,
+            fixado: item.fixado,
+            tagSetor: item.tag_setor,
+            corRibbon: item.tipo === 'urgente' ? '#E05A36' : '#02807E',
+            corRibbonSombra: item.tipo === 'urgente' ? '#B23A1A' : '#004D4C',
+            tagBg: item.tipo === 'urgente' ? '#FEF3C7' : '#CCFBF1',
+            tagColor: item.tipo === 'urgente' ? '#92400E' : '#0F766E',
+            badgeStatus: badges,
+            titulo: item.titulo,
+            meta: `Publicado às ${hora} • ${item.autor_nome || 'Supervisão EV'} • ${item.tag_setor}`,
+            descricao: item.descricao,
+            borda: item.tipo === 'urgente' ? '#F59E0B' : '#14B8A6',
+            fundo: item.tipo === 'urgente' ? '#FFFDF9' : '#F8FCFB'
+          };
+        });
+        setAvisos(formatados);
       }
+    } catch (err) {
+      console.error('Erro ao buscar comunicados:', err);
+    } finally {
+      setCarregando(false);
     }
+  };
+
+  useEffect(() => {
+    buscarAvisos();
+
+    // Inscrição em tempo real (atualiza a tela de todos automaticamente ao publicar)
+    const canal = supabase
+      .channel('avisos_realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'avisos_mural' }, () => {
+        buscarAvisos();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(canal);
+    };
   }, []);
 
-  // Estado do formulário de novo aviso
+  // 2. Formulário de Novo Comunicado
   const [formNovo, setFormNovo] = useState({
     titulo: '',
     tagSetor: 'TI/Financeiro',
@@ -74,76 +99,57 @@ export default function HomeView({ setView, isSupervisor }) {
     descricao: ''
   });
 
-  const handleSalvarAviso = (e) => {
+  const handleSalvarAviso = async (e) => {
     e.preventDefault();
     if (!formNovo.titulo.trim() || !formNovo.descricao.trim()) return;
 
-    const horaAtual = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    try {
+      const { error } = await supabase.from('avisos_mural').insert([
+        {
+          titulo: formNovo.titulo,
+          descricao: formNovo.descricao,
+          tag_setor: formNovo.tagSetor,
+          tipo: formNovo.tipo,
+          status_extra: formNovo.statusExtra,
+          fixado: formNovo.fixado,
+          autor_nome: 'Supervisão EV'
+        }
+      ]);
 
-    const badges = [
-      {
-        rotulo: formNovo.tipo === 'urgente' ? 'URGENTE' : 'INFORMATIVO',
-        bg: formNovo.tipo === 'urgente' ? '#FEE2E2' : '#E0F2FE',
-        cor: formNovo.tipo === 'urgente' ? '#991B1B' : '#0369A1'
-      }
-    ];
+      if (error) throw error;
 
-    if (formNovo.statusExtra && formNovo.statusExtra !== 'Nenhum') {
-      badges.push({
-        rotulo: formNovo.statusExtra,
-        bg: formNovo.statusExtra === '✓ SOLUCIONADO' ? '#DCFCE7' : formNovo.statusExtra === '⏳ EM ANDAMENTO' ? '#FEF3C7' : '#F1F5F9',
-        cor: formNovo.statusExtra === '✓ SOLUCIONADO' ? '#166534' : formNovo.statusExtra === '⏳ EM ANDAMENTO' ? '#92400E' : '#334155'
+      setModalPublicar(false);
+      setFormNovo({
+        titulo: '',
+        tagSetor: 'TI/Financeiro',
+        tipo: 'urgente',
+        statusExtra: '✓ SOLUCIONADO',
+        fixado: false,
+        descricao: ''
       });
+
+      setToast({ visivel: true, mensagem: '📢 Comunicado salvo no banco de dados!' });
+      setTimeout(() => setToast({ visivel: false, mensagem: '' }), 2600);
+    } catch (err) {
+      alert('Erro ao publicar: ' + err.message);
     }
-
-    if (formNovo.fixado) {
-      badges.push({ rotulo: '📌 FIXADO', bg: '#E2E8F0', cor: '#334155' });
-    }
-
-    const novoItem = {
-      id: Date.now(),
-      tipo: formNovo.tipo,
-      fixado: formNovo.fixado,
-      tagSetor: formNovo.tagSetor,
-      corRibbon: formNovo.tipo === 'urgente' ? '#E05A36' : '#02807E',
-      corRibbonSombra: formNovo.tipo === 'urgente' ? '#B23A1A' : '#004D4C',
-      tagBg: formNovo.tipo === 'urgente' ? '#FEF3C7' : '#CCFBF1',
-      tagColor: formNovo.tipo === 'urgente' ? '#92400E' : '#0F766E',
-      badgeStatus: badges,
-      titulo: formNovo.titulo,
-      meta: `Publicado hoje às ${horaAtual} • Supervisão EV • ${formNovo.tagSetor}`,
-      descricao: formNovo.descricao,
-      borda: formNovo.tipo === 'urgente' ? '#F59E0B' : '#14B8A6',
-      fundo: formNovo.tipo === 'urgente' ? '#FFFDF9' : '#F8FCFB'
-    };
-
-    const listaAtualizada = [novoItem, ...avisos];
-    setAvisos(listaAtualizada);
-    localStorage.setItem('capitu_mural_avisos', JSON.stringify(listaAtualizada));
-
-    setModalPublicar(false);
-    setFormNovo({
-      titulo: '',
-      tagSetor: 'TI/Financeiro',
-      tipo: 'urgente',
-      statusExtra: '✓ SOLUCIONADO',
-      fixado: false,
-      descricao: ''
-    });
-
-    setToast({ visivel: true, mensagem: '📢 Comunicado publicado no mural!' });
-    setTimeout(() => setToast({ visivel: false, mensagem: '' }), 2600);
   };
 
-  const handleExcluirAviso = (e, id) => {
+  // 3. Excluir comunicado no Supabase
+  const handleExcluirAviso = async (e, id) => {
     e.stopPropagation();
-    if (!window.confirm('Tem certeza de que deseja remover este comunicado do mural?')) return;
-    const listaAtualizada = avisos.filter((a) => a.id !== id);
-    setAvisos(listaAtualizada);
-    localStorage.setItem('capitu_mural_avisos', JSON.stringify(listaAtualizada));
-    if (modalAviso?.id === id) setModalAviso(null);
-    setToast({ visivel: true, mensagem: '🗑️ Comunicado removido!' });
-    setTimeout(() => setToast({ visivel: false, mensagem: '' }), 2400);
+    if (!window.confirm('Tem certeza de que deseja remover este comunicado?')) return;
+
+    try {
+      const { error } = await supabase.from('avisos_mural').delete().eq('id', id);
+      if (error) throw error;
+
+      if (modalAviso?.id === id) setModalAviso(null);
+      setToast({ visivel: true, mensagem: '🗑️ Comunicado removido com sucesso!' });
+      setTimeout(() => setToast({ visivel: false, mensagem: '' }), 2400);
+    } catch (err) {
+      alert('Erro ao excluir: ' + err.message);
+    }
   };
 
   const avisosFiltrados = avisos.filter((aviso) => {
@@ -155,7 +161,6 @@ export default function HomeView({ setView, isSupervisor }) {
   return (
     <div style={{ backgroundColor: '#F5F3EC', minHeight: '100vh', paddingBottom: '90px', position: 'relative', overflowX: 'hidden' }}>
       
-      {/* CLASSES CSS PARA TRANSIÇÕES E RESPONSIVIDADE */}
       <style>{`
         @keyframes cardFadeIn {
           from { opacity: 0; transform: translateY(10px) scale(0.99); }
@@ -259,13 +264,13 @@ export default function HomeView({ setView, isSupervisor }) {
           gap: 20px;
         }
 
-        @media (max-width: 1200px) {
+        @media (max-width: 1240px) {
           .mural-book-decor { display: none !important; }
           .mural-cards-wrapper { margin: 0 auto !important; max-width: 100% !important; }
         }
       `}</style>
 
-      {/* HERO SECTION COM BANNER VERDE ESCURO */}
+      {/* BANNER PRINCIPAL HERO */}
       <div style={{
         background: 'linear-gradient(135deg, var(--ev-teal-dark) 0%, var(--ev-teal-primary) 70%, #017B79 100%)',
         color: '#FFFFFF',
@@ -326,7 +331,7 @@ export default function HomeView({ setView, isSupervisor }) {
         </div>
       </div>
 
-      {/* ÁREA INFERIOR: MURAL DE AVISOS OPERACIONAIS */}
+      {/* ÁREA DO MURAL */}
       <div style={{ maxWidth: '1420px', margin: '48px auto 0 auto', padding: '0 24px', position: 'relative' }}>
         
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', marginBottom: '26px', padding: '0 12px' }}>
@@ -342,7 +347,6 @@ export default function HomeView({ setView, isSupervisor }) {
 
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
             <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-              {/* BOTÃO EXCLUSIVO DO SUPERVISOR PARA PUBLICAR */}
               {isSupervisor && (
                 <button onClick={() => setModalPublicar(true)} className="mural-btn-publish">
                   <span>🔐</span> Publicar Comunicado (Acesso Líder)
@@ -395,63 +399,63 @@ export default function HomeView({ setView, isSupervisor }) {
 
           {/* GRID DOS CARDS CENTRALIZADOS */}
           <div key={filtroAvisos} className="mural-cards-wrapper" style={{ width: '100%', maxWidth: '1060px', margin: '0 150px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(440px, 1fr))', gap: '28px', position: 'relative', zIndex: 2 }}>
-            {avisosFiltrados.map((aviso) => (
-              <div key={aviso.id} onClick={() => setModalAviso(aviso)} className="mural-card-item" style={{ backgroundColor: aviso.fundo, borderColor: aviso.borda }}>
-                
-                <div style={{ position: 'absolute', left: '12px', top: '16px', bottom: '16px', width: '26px', display: 'flex', gap: '4px', pointerEvents: 'none' }}>
-                  <div style={{ width: '2px', height: '100%', backgroundColor: '#9E8D79', borderRadius: '1px' }} />
-                  <div style={{ width: '2px', height: '98%', margin: 'auto 0', backgroundColor: '#B8A894', borderRadius: '1px' }} />
-                  <div style={{ width: '2px', height: '95%', margin: 'auto 0', backgroundColor: '#C7B7A3', borderRadius: '1px' }} />
-                  <div style={{ width: '2px', height: '92%', margin: 'auto 0', backgroundColor: '#D7C9B8', borderRadius: '1px' }} />
-                </div>
-
-                <div title={aviso.tagSetor} style={{ position: 'absolute', top: '-14px', right: '54px', width: '32px', height: '52px', backgroundColor: aviso.corRibbon, clipPath: 'polygon(0 0, 100% 0, 100% 100%, 50% 82%, 0 100%)', filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.22))', zIndex: 5 }}>
-                  <div style={{ width: '100%', height: '7px', backgroundColor: aviso.corRibbonSombra }} />
-                </div>
-
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', paddingRight: '56px' }}>
-                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                      {aviso.badgeStatus.map((b, idx) => (
-                        <span key={idx} style={{ backgroundColor: b.bg, color: b.cor, fontSize: '0.72rem', fontWeight: '800', padding: '3px 10px', borderRadius: '9999px', letterSpacing: '0.4px' }}>{b.rotulo}</span>
-                      ))}
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ backgroundColor: aviso.tagBg, color: aviso.tagColor, fontSize: '0.74rem', fontWeight: '800', padding: '3px 10px', borderRadius: '8px', letterSpacing: '0.3px', textTransform: 'uppercase' }}>
-                        {aviso.tagSetor}
-                      </span>
-                      {/* Botão de exclusão para o supervisor */}
-                      {isSupervisor && (
-                        <button
-                          onClick={(e) => handleExcluirAviso(e, aviso.id)}
-                          title="Remover aviso do mural"
-                          style={{
-                            background: '#FEE2E2',
-                            color: '#991B1B',
-                            border: 'none',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            padding: '2px 6px',
-                            fontSize: '0.75rem',
-                            fontWeight: '700'
-                          }}
-                        >
-                          ✕
-                        </button>
-                      )}
-                    </div>
+            {carregando ? (
+              <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontWeight: '600' }}>
+                📖 Folheando as páginas do mural...
+              </div>
+            ) : avisosFiltrados.length === 0 ? (
+              <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontWeight: '600' }}>
+                Nenhum comunicado operacional nesta categoria.
+              </div>
+            ) : (
+              avisosFiltrados.map((aviso) => (
+                <div key={aviso.id} onClick={() => setModalAviso(aviso)} className="mural-card-item" style={{ backgroundColor: aviso.fundo, borderColor: aviso.borda }}>
+                  
+                  <div style={{ position: 'absolute', left: '12px', top: '16px', bottom: '16px', width: '26px', display: 'flex', gap: '4px', pointerEvents: 'none' }}>
+                    <div style={{ width: '2px', height: '100%', backgroundColor: '#9E8D79', borderRadius: '1px' }} />
+                    <div style={{ width: '2px', height: '98%', margin: 'auto 0', backgroundColor: '#B8A894', borderRadius: '1px' }} />
+                    <div style={{ width: '2px', height: '95%', margin: 'auto 0', backgroundColor: '#C7B7A3', borderRadius: '1px' }} />
+                    <div style={{ width: '2px', height: '92%', margin: 'auto 0', backgroundColor: '#D7C9B8', borderRadius: '1px' }} />
                   </div>
 
-                  <h3 style={{ margin: '0 0 8px 0', fontSize: '1.3rem', fontWeight: '800', color: 'var(--ev-teal-dark)', lineHeight: '1.35' }}>{aviso.titulo}</h3>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: '600', marginBottom: '16px' }}>{aviso.meta}</div>
-                  <p style={{ margin: 0, fontSize: '0.94rem', color: '#334155', lineHeight: '1.65' }}>{aviso.descricao}</p>
-                </div>
+                  <div title={aviso.tagSetor} style={{ position: 'absolute', top: '-14px', right: '54px', width: '32px', height: '52px', backgroundColor: aviso.corRibbon, clipPath: 'polygon(0 0, 100% 0, 100% 100%, 50% 82%, 0 100%)', filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.22))', zIndex: 5 }}>
+                    <div style={{ width: '100%', height: '7px', backgroundColor: aviso.corRibbonSombra }} />
+                  </div>
 
-                <div style={{ marginTop: '18px', paddingTop: '12px', borderTop: '1px dashed rgba(0, 0, 0, 0.12)', textAlign: 'right', fontSize: '0.78rem', fontWeight: '700', color: 'var(--ev-teal-primary)' }}>
-                  Clique para ver comunicado completo 🔍
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', paddingRight: '56px' }}>
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                        {aviso.badgeStatus.map((b, idx) => (
+                          <span key={idx} style={{ backgroundColor: b.bg, color: b.cor, fontSize: '0.72rem', fontWeight: '800', padding: '3px 10px', borderRadius: '9999px', letterSpacing: '0.4px' }}>{b.rotulo}</span>
+                        ))}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ backgroundColor: aviso.tagBg, color: aviso.tagColor, fontSize: '0.74rem', fontWeight: '800', padding: '3px 10px', borderRadius: '8px', letterSpacing: '0.3px', textTransform: 'uppercase' }}>
+                          {aviso.tagSetor}
+                        </span>
+                        {isSupervisor && (
+                          <button
+                            onClick={(e) => handleExcluirAviso(e, aviso.id)}
+                            title="Remover aviso do mural"
+                            style={{ background: '#FEE2E2', color: '#991B1B', border: 'none', borderRadius: '6px', cursor: 'pointer', padding: '2px 6px', fontSize: '0.75rem', fontWeight: '700' }}
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <h3 style={{ margin: '0 0 8px 0', fontSize: '1.3rem', fontWeight: '800', color: 'var(--ev-teal-dark)', lineHeight: '1.35' }}>{aviso.titulo}</h3>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: '600', marginBottom: '16px' }}>{aviso.meta}</div>
+                    <p style={{ margin: 0, fontSize: '0.94rem', color: '#334155', lineHeight: '1.65' }}>{aviso.descricao}</p>
+                  </div>
+
+                  <div style={{ marginTop: '18px', paddingTop: '12px', borderTop: '1px dashed rgba(0, 0, 0, 0.12)', textAlign: 'right', fontSize: '0.78rem', fontWeight: '700', color: 'var(--ev-teal-primary)' }}>
+                    Clique para ver comunicado completo 🔍
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
 
           {/* ILUSTRAÇÃO LATERAL DIREITA: TORRE DE LIVROS EMPILHADOS */}
@@ -590,103 +594,28 @@ export default function HomeView({ setView, isSupervisor }) {
         </div>
       )}
 
-      {/* MODAL DE PUBLICAR COMUNICADO (EXCLUSIVO PARA SUPERVISOR) */}
+      {/* MODAL DE PUBLICAR COMUNICADO (ACESSO SUPERVISOR) */}
       {modalPublicar && isSupervisor && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 30, 30, 0.65)',
-            backdropFilter: 'blur(5px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1400,
-            padding: '20px'
-          }}
-          onClick={() => setModalPublicar(false)}
-        >
-          <div
-            style={{
-              backgroundColor: '#FFFFFF',
-              borderRadius: '20px',
-              padding: '32px 36px',
-              width: '100%',
-              maxWidth: '640px',
-              boxShadow: '0 25px 50px rgba(0, 30, 30, 0.25)',
-              border: '2px solid var(--border-subtle)'
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 30, 30, 0.65)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1400, padding: '20px' }} onClick={() => setModalPublicar(false)}>
+          <div style={{ backgroundColor: '#FFFFFF', borderRadius: '20px', padding: '32px 36px', width: '100%', maxWidth: '640px', boxShadow: '0 25px 50px rgba(0, 30, 30, 0.25)', border: '2px solid var(--border-subtle)' }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <div>
-                <span style={{ fontSize: '0.74rem', fontWeight: '800', color: 'var(--ev-teal-primary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  Acesso Restrito ao Líder
-                </span>
-                <h3 style={{ margin: '2px 0 0 0', color: 'var(--ev-teal-dark)', fontSize: '1.4rem', fontWeight: '800' }}>
-                  📢 Novo Comunicado no Mural
-                </h3>
+                <span style={{ fontSize: '0.74rem', fontWeight: '800', color: 'var(--ev-teal-primary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Acesso Restrito ao Líder</span>
+                <h3 style={{ margin: '2px 0 0 0', color: 'var(--ev-teal-dark)', fontSize: '1.4rem', fontWeight: '800' }}>📢 Novo Comunicado no Mural</h3>
               </div>
-              <button
-                type="button"
-                onClick={() => setModalPublicar(false)}
-                style={{
-                  background: '#F1F5F9',
-                  border: 'none',
-                  width: '36px',
-                  height: '36px',
-                  borderRadius: '50%',
-                  fontSize: '1rem',
-                  cursor: 'pointer',
-                  color: '#64748B'
-                }}
-              >
-                ✕
-              </button>
+              <button type="button" onClick={() => setModalPublicar(false)} style={{ background: '#F1F5F9', border: 'none', width: '36px', height: '36px', borderRadius: '50%', fontSize: '1rem', cursor: 'pointer', color: '#64748B' }}>✕</button>
             </div>
 
             <form onSubmit={handleSalvarAviso} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: '700', marginBottom: '6px', color: 'var(--text-dark)' }}>
-                  Título do Comunicado:
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Ex: Instabilidade no Gateway de Pagamentos PIX"
-                  value={formNovo.titulo}
-                  onChange={(e) => setFormNovo({ ...formNovo, titulo: e.target.value })}
-                  style={{
-                    width: '100%',
-                    padding: '10px 14px',
-                    borderRadius: '8px',
-                    border: '1.5px solid #CBD5E1',
-                    fontSize: '0.92rem',
-                    outline: 'none'
-                  }}
-                />
+                <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: '700', marginBottom: '6px', color: 'var(--text-dark)' }}>Título do Comunicado:</label>
+                <input type="text" required placeholder="Ex: Instabilidade no Gateway de Pagamentos PIX" value={formNovo.titulo} onChange={(e) => setFormNovo({ ...formNovo, titulo: e.target.value })} style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1.5px solid #CBD5E1', fontSize: '0.92rem', outline: 'none' }} />
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: '700', marginBottom: '6px', color: 'var(--text-dark)' }}>
-                    Setor Envolvido:
-                  </label>
-                  <select
-                    value={formNovo.tagSetor}
-                    onChange={(e) => setFormNovo({ ...formNovo, tagSetor: e.target.value })}
-                    style={{
-                      width: '100%',
-                      padding: '10px 12px',
-                      borderRadius: '8px',
-                      border: '1.5px solid #CBD5E1',
-                      fontSize: '0.88rem',
-                      background: '#FFF'
-                    }}
-                  >
+                  <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: '700', marginBottom: '6px', color: 'var(--text-dark)' }}>Setor Envolvido:</label>
+                  <select value={formNovo.tagSetor} onChange={(e) => setFormNovo({ ...formNovo, tagSetor: e.target.value })} style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1.5px solid #CBD5E1', fontSize: '0.88rem', background: '#FFF' }}>
                     <option value="TI/Financeiro">TI/Financeiro</option>
                     <option value="Logística">Logística / Correios</option>
                     <option value="Atendimento">Atendimento / CS</option>
@@ -696,21 +625,8 @@ export default function HomeView({ setView, isSupervisor }) {
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: '700', marginBottom: '6px', color: 'var(--text-dark)' }}>
-                    Criticidade:
-                  </label>
-                  <select
-                    value={formNovo.tipo}
-                    onChange={(e) => setFormNovo({ ...formNovo, tipo: e.target.value })}
-                    style={{
-                      width: '100%',
-                      padding: '10px 12px',
-                      borderRadius: '8px',
-                      border: '1.5px solid #CBD5E1',
-                      fontSize: '0.88rem',
-                      background: '#FFF'
-                    }}
-                  >
+                  <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: '700', marginBottom: '6px', color: 'var(--text-dark)' }}>Criticidade:</label>
+                  <select value={formNovo.tipo} onChange={(e) => setFormNovo({ ...formNovo, tipo: e.target.value })} style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1.5px solid #CBD5E1', fontSize: '0.88rem', background: '#FFF' }}>
                     <option value="urgente">⚠️ Urgente (Borda Âmbar)</option>
                     <option value="informativo">ℹ️ Informativo (Borda Verde)</option>
                   </select>
@@ -719,21 +635,8 @@ export default function HomeView({ setView, isSupervisor }) {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: '700', marginBottom: '6px', color: 'var(--text-dark)' }}>
-                    Status da Resolução:
-                  </label>
-                  <select
-                    value={formNovo.statusExtra}
-                    onChange={(e) => setFormNovo({ ...formNovo, statusExtra: e.target.value })}
-                    style={{
-                      width: '100%',
-                      padding: '10px 12px',
-                      borderRadius: '8px',
-                      border: '1.5px solid #CBD5E1',
-                      fontSize: '0.88rem',
-                      background: '#FFF'
-                    }}
-                  >
+                  <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: '700', marginBottom: '6px', color: 'var(--text-dark)' }}>Status da Resolução:</label>
+                  <select value={formNovo.statusExtra} onChange={(e) => setFormNovo({ ...formNovo, statusExtra: e.target.value })} style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1.5px solid #CBD5E1', fontSize: '0.88rem', background: '#FFF' }}>
                     <option value="✓ SOLUCIONADO">✓ SOLUCIONADO</option>
                     <option value="⏳ EM ANDAMENTO">⏳ EM ANDAMENTO</option>
                     <option value="Nenhum">Nenhum status extra</option>
@@ -742,70 +645,20 @@ export default function HomeView({ setView, isSupervisor }) {
 
                 <div style={{ display: 'flex', alignItems: 'center', paddingTop: '24px' }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.88rem', fontWeight: '700', color: 'var(--text-dark)' }}>
-                    <input
-                      type="checkbox"
-                      checked={formNovo.fixado}
-                      onChange={(e) => setFormNovo({ ...formNovo, fixado: e.target.checked })}
-                      style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-                    />
+                    <input type="checkbox" checked={formNovo.fixado} onChange={(e) => setFormNovo({ ...formNovo, fixado: e.target.checked })} style={{ width: '18px', height: '18px', cursor: 'pointer' }} />
                     📌 Fixar comunicado no topo
                   </label>
                 </div>
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: '700', marginBottom: '6px', color: 'var(--text-dark)' }}>
-                  Conteúdo e Orientações Operacionais:
-                </label>
-                <textarea
-                  required
-                  rows="4"
-                  placeholder="Escreva os detalhes, orientações do que os agentes devem fazer e status dos chamados..."
-                  value={formNovo.descricao}
-                  onChange={(e) => setFormNovo({ ...formNovo, descricao: e.target.value })}
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    borderRadius: '8px',
-                    border: '1.5px solid #CBD5E1',
-                    fontSize: '0.9rem',
-                    lineHeight: '1.5',
-                    outline: 'none'
-                  }}
-                />
+                <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: '700', marginBottom: '6px', color: 'var(--text-dark)' }}>Conteúdo e Orientações Operacionais:</label>
+                <textarea required rows="4" placeholder="Escreva os detalhes operacionais..." value={formNovo.descricao} onChange={(e) => setFormNovo({ ...formNovo, descricao: e.target.value })} style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1.5px solid #CBD5E1', fontSize: '0.9rem', lineHeight: '1.5', outline: 'none' }} />
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '12px' }}>
-                <button
-                  type="button"
-                  onClick={() => setModalPublicar(false)}
-                  style={{
-                    padding: '9px 18px',
-                    borderRadius: '8px',
-                    border: 'none',
-                    backgroundColor: '#F1F5F9',
-                    color: '#475569',
-                    fontWeight: '700',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  style={{
-                    padding: '9px 24px',
-                    borderRadius: '8px',
-                    border: 'none',
-                    backgroundColor: 'var(--ev-teal-primary)',
-                    color: '#FFFFFF',
-                    fontWeight: '800',
-                    cursor: 'pointer',
-                    boxShadow: '0 4px 12px rgba(0, 105, 104, 0.25)'
-                  }}
-                >
-                  Publicar Comunicado
-                </button>
+                <button type="button" onClick={() => setModalPublicar(false)} style={{ padding: '9px 18px', borderRadius: '8px', border: 'none', backgroundColor: '#F1F5F9', color: '#475569', fontWeight: '700', cursor: 'pointer' }}>Cancelar</button>
+                <button type="submit" style={{ padding: '9px 24px', borderRadius: '8px', border: 'none', backgroundColor: 'var(--ev-teal-primary)', color: '#FFFFFF', fontWeight: '800', cursor: 'pointer', boxShadow: '0 4px 12px rgba(0, 105, 104, 0.25)' }}>Publicar Comunicado</button>
               </div>
             </form>
           </div>
