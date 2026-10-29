@@ -362,7 +362,25 @@ export default function Page() {
       </header>
 
       {/* RENDERIZAÇÃO DAS TELAS DO SISTEMA */}
-      <main>
+{/* CSS DA TRANSIÇÃO SUAVE (FADE IN + SLIDE UP) */}
+<style jsx global>{`
+        @keyframes surgirTela {
+          from {
+            opacity: 0;
+            transform: translateY(8px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .animacao-troca-tela {
+          animation: surgirTela 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+      `}</style>
+
+      {/* RENDERIZAÇÃO DAS TELAS COM TRANSIÇÃO SUAVE */}
+      <main key={view} className="animacao-troca-tela">
         {view === 'inicio' && (
           <HomeView
             setView={setView}
