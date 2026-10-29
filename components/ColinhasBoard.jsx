@@ -390,6 +390,46 @@ export default function ColinhasBoard({ isSupervisor }) {
     setModalAberto(true);
   };
 
+  // Função para enviar os dados para o Supabase
+  const handleMigrarColinhasParaSupabase = async () => {
+    // 1. Tenta obter a lista de dados definida no ficheiro
+    const listaParaEnviar = typeof COLINHAS_INICIAIS !== 'undefined' 
+      ? COLINHAS_INICIAIS 
+      : colinhas;
+
+    if (!listaParaEnviar || listaParaEnviar.length === 0) {
+      alert('Nenhuma colinha encontrada para migrar.');
+      return;
+    }
+
+    if (!window.confirm(`Deseja importar ${listaParaEnviar.length} colinhas para o banco de dados do Supabase?`)) {
+      return;
+    }
+
+    try {
+      // Faz o mapeamento dos campos (t -> titulo, c -> categoria, txt -> conteudo)
+      const dadosFormatados = listaParaEnviar.map((item) => ({
+        titulo: item.t || item.titulo,
+        categoria: item.c || item.categoria,
+        conteudo: item.txt || item.conteudo,
+        atalho: item.atalho || '',
+        autor_nome: 'Supervisão EV'
+      }));
+
+      const { error } = await supabase.from('colinhas').insert(dadosFormatados);
+
+      if (error) throw error;
+
+      alert('Todas as colinhas foram gravadas no Supabase com sucesso!');
+      if (typeof buscarColinhas === 'function') {
+        await buscarColinhas();
+      }
+    } catch (err) {
+      alert('Erro na migração: ' + err.message);
+    }
+  };
+
+
     {/* BOTÃO TEMPORÁRIO DE CARGA INICIAL */}
     {isSupervisor && (
     <button
