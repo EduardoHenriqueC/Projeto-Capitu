@@ -145,27 +145,73 @@ export default function ColinhasBoard({ isSupervisor }) {
   };
 
   const abrirModalCriar = () => {
-    setFormData({ id: null, t: '', c: '🗣️ Relacionamento', txt: '' });
+    setFormData({ id: null, t: '', c: '🗣️ Relacionamento', atalho: '', txt: '' });
     setModalAberto(true);
   };
 
   const abrirModalEditar = (e, item) => {
     e.stopPropagation();
-    setFormData({ ...item });
+    setFormData({
+      id: item.id,
+      t: item.t,
+      c: item.c,
+      atalho: item.atalho || '',
+      txt: item.txt
+    });
     setModalAberto(true);
   };
 
-  const salvarColinha = (e) => {
+  const salvarColinha = async (e) => {
     e.preventDefault();
-    if (formData.id) {
-      setColinhas(colinhas.map((c) => (c.id === formData.id ? formData : c)));
-      setToast({ visivel: true, mensagem: '✏️ Colinha atualizada!' });
-    } else {
-      setColinhas([{ ...formData, id: Date.now() }, ...colinhas]);
-      setToast({ visivel: true, mensagem: '✨ Nova colinha publicada!' });
+
+    // Validação básica dos campos obrigatórios
+    if (!formData.t.trim() || !formData.txt.trim()) {
+      alert('Preencha o título e o conteúdo da colinha.');
+      return;
     }
-    setModalAberto(false);
-    setTimeout(() => setToast({ visivel: false, mensagem: '' }), 2500);
+
+    try {
+      if (formData.id) {
+        // --- MODO EDIÇÃO: Atualiza o registro existente no Supabase ---
+        const { error } = await supabase
+          .from('colinhas')
+          .update({
+            titulo: formData.t,
+            categoria: formData.c,
+            conteudo: formData.txt,
+            atalho: formData.atalho || '',
+            atualizado_em: new Date().toISOString()
+          })
+          .eq('id', formData.id);
+
+        if (error) throw error;
+        alert('✅ Colinha atualizada com sucesso no banco!');
+      } else {
+        // --- MODO CRIAÇÃO: Insere um novo registro no Supabase ---
+        const { error } = await supabase
+          .from('colinhas')
+          .insert([
+            {
+              titulo: formData.t,
+              categoria: formData.c,
+              conteudo: formData.txt,
+              atalho: formData.atalho || '',
+              autor_nome: usuarioLogado?.nome || 'Supervisão EV'
+            }
+          ]);
+
+        if (error) throw error;
+        alert('✨ Nova colinha salva com sucesso no banco!');
+      }
+
+      // Fecha o modal e recarrega a listagem direto do Supabase
+      setModalAberto(false);
+      setFormData({ id: null, t: '', c: '🗣️ Relacionamento', atalho: '', txt: '' });
+      await buscarColinhas();
+    } catch (err) {
+      console.error('Erro ao salvar no Supabase:', err);
+      alert('Erro ao gravar no banco: ' + err.message);
+    }
   };
 
   const colinhasFiltradas = colinhas.filter((c) => {
