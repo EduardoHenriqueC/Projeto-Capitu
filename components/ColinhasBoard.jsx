@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import { supabase } from '../lib/supabase';
 
 export default function ColinhasBoard({ isSupervisor }) {
   const [agente, setAgente] = useState('');
@@ -53,7 +54,7 @@ export default function ColinhasBoard({ isSupervisor }) {
     }
   };
 
-  const [colinhas, setColinhas] = useState([
+    const COLINHAS_INICIAIS = [
     { id: 1, c: '🗣️ Relacionamento', t: 'Avaliação Padrão', txt: `Caso esteja tudo em ordem, dentro de 24 horas ⏱, você receberá um e-mail contendo uma pesquisa de avaliação sobre o meu atendimento:\nNotas 1 e 2 para ruim e notas 4 e 5 para muito bom!` },
     { id: 2, c: '🗣️ Relacionamento', t: 'Boas Festas', txt: `Agradecemos por ter feito parte da nossa história em 2025, é um privilégio ter você conosco. Desejamos um próspero 2026!` },
     { id: 3, c: '🗣️ Relacionamento', t: 'Reforço Cordialidade', txt: `Olá, XXXXXX!\n\nAgradecemos pelo retorno. Reforço nossa cordialidade para com os clientes, por ajudar a manter uma boa experiência para o cliente e refletir a qualidade do atendimento que buscamos oferecer.\n\nPrecisando de ajuda não hesite em me chamar, estou aqui, ok!` },
@@ -286,7 +287,55 @@ export default function ColinhasBoard({ isSupervisor }) {
     { id: 228, c: '🛒 Plataforma', t: 'Informações para outro e-mail', txt: `Olá, XXX!\n\nO protocolo do seu atendimento é o: XXX\n\nAgradecemos pelo seu contato!\n\nPor motivos de segurança, não conseguimos encaminhar informações do pedido para um e-mail diferente daquele utilizado na compra.\n\nMas fique tranquilo, todas as atualizações e detalhes do seu pedido podem ser acompanhados diretamente pelo site da Estante Virtual, na sua conta.\n\nSe tiver qualquer dificuldade em localizar as informações ou precisar de ajuda com alguma etapa, estamos à disposição para te auxiliar por aqui!\n\nCaso esteja tudo em ordem, dentro de 24 horas ⏱, você receberá um e-mail contendo uma pesquisa de avaliação sobre o meu atendimento:\nNotas 1 e 2 para ruim e notas 4 e 5 para muito bom!` },
     { id: 229, c: '🛒 Plataforma', t: 'Interesse em Vender Livros', txt: `Olá, XXX!\n\nO protocolo do seu atendimento é o: XXX\n\nAgradecemos muito o seu contato e o interesse 😊\n\nNo momento, não realizamos a compra direta de livros. No entanto, caso tenha interesse em vendê-los, ficaremos felizes em tê-lo conosco como vendedor! Para isso, basta realizar um cadastro em nosso site por meio do link: https://universo.magalu.com/estante-virtual.\n\nApós o cadastro, você poderá anunciar suas obras e gerenciar suas vendas de forma prática.\n\nFicamos à disposição caso tenha qualquer dúvida ou precise de apoio no processo.` },
     { id: 230, c: '🛒 Plataforma', t: 'Programa Compra e Volta', txt: `Olá, XXX!\n\nO protocolo do seu atendimento é o: xxxxx\n\nA Estante Virtual está com a parceria com o Programa Compra e Volta! Para maiores informações, entre em contato com eles através dos canais abaixo:\n\nSite: https://www.compraevolta.com.br/\nE-mail: atendimento@compraevolta.com.br\nTelefone: 0800 761 7300\nHorário funcionamento: Segunda a sexta 08h às 20h e sábado 09h às 16h\nHorário de Brasília\n*exceto feriados\n\nSigo à disposição.\n\nCaso esteja tudo em ordem, dentro de 24 horas ⏱, você receberá um e-mail contendo uma pesquisa de avaliação sobre o meu atendimento:\nNotas 1 e 2 para ruim e notas 4 e 5 para muito bom!` }
-  ]);
+  ];
+
+  const [colinhas, setColinhas] = useState([]);
+
+  // 1. FUNÇÃO QUE BUSCA AS COLINHAS NO BANCO DO SUPABASE
+  const buscarColinhas = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('colinhas')
+        .select('*')
+        .order('categoria', { ascending: true })
+        .order('titulo', { ascending: true });
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        // Converte os nomes das colunas do Supabase (titulo, categoria, conteudo)
+        // para os nomes que seu componente usa (t, c, txt)
+        setColinhas(
+          data.map((item) => ({
+            id: item.id,
+            t: item.titulo,
+            c: item.categoria,
+            txt: item.conteudo,
+            atalho: item.atalho || ''
+          }))
+        );
+      }
+    } catch (err) {
+      console.error('Erro ao buscar colinhas no Supabase:', err);
+    }
+  };
+
+  // 2. DISPARA A BUSCA AO ABRIR A PÁGINA E ATIVA O REALTIME
+  useEffect(() => {
+    buscarColinhas();
+
+    // Sincronização em tempo real (qualquer alteração atualiza a tela na hora)
+    const canal = supabase
+      .channel('colinhas_realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'colinhas' }, () => {
+        buscarColinhas();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(canal);
+    };
+  }, []);
 
   // Foco automático no modal quando ele é aberto para permitir o Ctrl+A imediato
   useEffect(() => {
@@ -326,6 +375,7 @@ export default function ColinhasBoard({ isSupervisor }) {
         final += `\n\nAtenciosamente,\nEquipe Estante Virtual 💚`;
       }
     }
+
     return final;
   };
 
@@ -339,6 +389,27 @@ export default function ColinhasBoard({ isSupervisor }) {
     setFormData({ ...item });
     setModalAberto(true);
   };
+
+    {/* BOTÃO TEMPORÁRIO DE CARGA INICIAL */}
+    {isSupervisor && (
+    <button
+    type="button"
+    onClick={handleMigrarColinhasParaSupabase}
+    style={{
+      backgroundColor: '#FEF3C7',
+      color: '#92400E',
+      border: '1.5px dashed #D97706',
+      padding: '8px 16px',
+      borderRadius: '8px',
+      cursor: 'pointer',
+      fontWeight: '800',
+      fontSize: '0.85rem',
+      marginRight: '10px'
+    }}
+  >
+    📥 Migrar Colinhas para o Banco
+  </button>
+)}
 
   const salvarColinha = (e) => {
     e.preventDefault();
