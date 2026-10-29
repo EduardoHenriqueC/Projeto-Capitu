@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 
-export default function ColinhasBoard({ isSupervisor }) {
+export default function ColinhasBoard({ isSupervisor, usuarioLogado}) {
   const [agente, setAgente] = useState('');
   const [isMounted, setIsMounted] = useState(false);
   const [categoriaAtiva, setCategoriaAtiva] = useState('Todas as Colinhas');
@@ -196,7 +196,9 @@ export default function ColinhasBoard({ isSupervisor }) {
               categoria: formData.c,
               conteudo: formData.txt,
               atalho: formData.atalho || '',
-              autor_nome: usuarioLogado?.nome || 'Supervisão EV'
+              autor_nome: (typeof usuarioLogado !== 'undefined' && usuarioLogado?.nome) 
+              ? usuarioLogado.nome 
+              : 'Supervisão EV'
             }
           ]);
 
