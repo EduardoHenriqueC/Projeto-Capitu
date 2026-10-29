@@ -5,22 +5,24 @@ import { supabase } from '../lib/supabase';
 
 export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
   const [comunicados, setComunicados] = useState([]);
-  const [filtroAtivo, setFiltroAtivo] = useState('Todos'); // 'Todos' | 'Urgentes' | 'Fixados'
+  const [filtroAtivo, setFiltroAtivo] = useState('Todos');
+  const [buscaHero, setBuscaHero] = useState('');
+  
+  // Modais
   const [modalPublicar, setModalPublicar] = useState(false);
   const [modalDetalhes, setModalDetalhes] = useState(null);
-  const [carregando, setCarregando] = useState(true);
 
-  // Formulário de publicação
+  // Formulário de publicação (Supervisão)
   const [formAviso, setFormAviso] = useState({
     titulo: '',
-    tipo: 'INFORMATIVO', // 'INFORMATIVO' | 'URGENTE'
-    status: 'EM ANDAMENTO', // 'EM ANDAMENTO' | 'SOLUCIONADO'
+    tipo: 'INFORMATIVO',
+    status: 'EM ANDAMENTO',
     departamento: 'TI/FINANCEIRO',
     fixado: true,
     conteudo: ''
   });
 
-  // 1. CARREGAR AVISOS DO SUPABASE
+  // 1. CARREGAR AVISOS DO MURAL
   const buscarComunicados = async () => {
     try {
       const { data, error } = await supabase
@@ -28,8 +30,10 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
         .select('*')
         .order('id', { ascending: false });
 
-      if (error) {
-        // Se a tabela ainda não existir no banco, mantém os comunicados de exemplo da tela
+      if (!error && data && data.length > 0) {
+        setComunicados(data);
+      } else {
+        // Dados padrão idênticos ao painel em tela
         setComunicados([
           {
             id: 1,
@@ -54,22 +58,17 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
             conteudo: 'Só queria dizer que te amo muito 💖💖💖💖💖'
           }
         ]);
-      } else if (data && data.length > 0) {
-        setComunicados(data);
       }
     } catch (err) {
-      console.error('Erro ao buscar avisos do mural:', err);
-    } finally {
-      setCarregando(false);
+      console.error('Erro ao ler avisos do mural:', err);
     }
   };
 
   useEffect(() => {
     buscarComunicados();
 
-    // Sincronização em tempo real do mural
     const canal = supabase
-      .channel('comunicados_realtime')
+      .channel('comunicados_mural_realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'comunicados_mural' }, () => {
         buscarComunicados();
       })
@@ -80,30 +79,35 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
     };
   }, []);
 
-  // 2. SALVAR NOVO COMUNICADO
+  // 2. DISPARAR BUSCA DO HERO PARA AS COLINHAS
+  const handleBuscaHero = (e) => {
+    e.preventDefault();
+    setView('colinhas');
+  };
+
+  // 3. PUBLICAR COMUNICADO
   const handleSalvarComunicado = async (e) => {
     e.preventDefault();
     if (!formAviso.titulo.trim() || !formAviso.conteudo.trim()) return;
 
     const agora = new Date();
-    const horarioFormatado = agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const horario = agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
-    const novoItem = {
+    const novoAviso = {
       titulo: formAviso.titulo,
       tipo: formAviso.tipo,
       status: formAviso.status,
       departamento: formAviso.departamento,
       fixado: formAviso.fixado,
-      horario: horarioFormatado,
+      horario,
       autor: usuarioLogado?.nome ? `Supervisão EV (${usuarioLogado.nome})` : 'Supervisão EV',
       conteudo: formAviso.conteudo
     };
 
     try {
-      const { error } = await supabase.from('comunicados_mural').insert([novoItem]);
+      const { error } = await supabase.from('comunicados_mural').insert([novoAviso]);
       if (error) {
-        // Fallback caso a tabela ainda não exista no banco
-        setComunicados([ { ...novoItem, id: Date.now() }, ...comunicados ]);
+        setComunicados([{ ...novoAviso, id: Date.now() }, ...comunicados]);
       } else {
         await buscarComunicados();
       }
@@ -117,14 +121,14 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
         conteudo: ''
       });
     } catch (err) {
-      alert('Erro ao publicar: ' + err.message);
+      alert('Erro ao salvar comunicado: ' + err.message);
     }
   };
 
-  // 3. EXCLUIR COMUNICADO DO MURAL
+  // 4. EXCLUIR COMUNICADO DO MURAL
   const handleExcluirComunicado = async (e, id) => {
     e.stopPropagation();
-    if (!window.confirm('Deseja excluir este aviso do mural?')) return;
+    if (!window.confirm('Deseja remover este comunicado do mural?')) return;
 
     try {
       await supabase.from('comunicados_mural').delete().eq('id', id);
@@ -135,7 +139,7 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
     }
   };
 
-  // Filtragem
+  // Filtros
   const comunicadosFiltrados = comunicados.filter((c) => {
     if (filtroAtivo === 'Urgentes') return c.tipo === 'URGENTE';
     if (filtroAtivo === 'Fixados') return c.fixado;
@@ -143,436 +147,656 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
   });
 
   return (
-    <div style={{ maxWidth: '1440px', margin: '0 auto', padding: '36px 32px 80px 32px', position: 'relative' }}>
+    <div style={{ width: '100%', minHeight: '100vh', backgroundColor: '#F8FAFC' }}>
       
-      {/* KEYFRAMES DA TRANSIÇÃO SUAVE */}
+      {/* KEYFRAMES DE TRANSIÇÃO SUAVE */}
       <style jsx>{`
-        @keyframes fadeSlideCard {
+        @keyframes fadeCard {
           from {
             opacity: 0;
-            transform: translateY(14px) scale(0.98);
+            transform: translateY(10px) scale(0.99);
           }
           to {
             opacity: 1;
             transform: translateY(0) scale(1);
           }
         }
-        .animar-card-mural {
-          animation: fadeSlideCard 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        .animar-mural {
+          animation: fadeCard 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
       `}</style>
 
-      {/* CABEÇALHO DO MURAL */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        flexWrap: 'wrap',
-        gap: '20px',
-        marginBottom: '36px'
+      {/* ========================================================
+          1. HERO HEADER VERDE COMPLETO (EXATAMENTE COMO NA FOTO)
+      ======================================================== */}
+      <section style={{
+        backgroundColor: '#005856',
+        padding: '54px 24px 60px 24px',
+        textAlign: 'center',
+        color: '#FFFFFF'
       }}>
-        {/* TÍTULO E BADGE TEMPO REAL */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <span style={{ fontSize: '1.9rem' }}>📢</span>
+        <div style={{ maxWidth: '1180px', margin: '0 auto' }}>
+          
+          {/* TÍTULO PRINCIPAL */}
           <h1 style={{
-            margin: 0,
-            fontSize: '1.75rem',
+            fontSize: '2.5rem',
             fontWeight: '900',
-            color: '#005856',
-            letterSpacing: '-0.4px'
+            margin: '0 0 10px 0',
+            letterSpacing: '-0.5px'
           }}>
-            Mural de Avisos Operacionais
+            Qual a leitura <span style={{ color: '#5EEAD4' }}>de hoje?</span>
           </h1>
-          <span style={{
-            backgroundColor: '#DCFCE7',
-            color: '#166534',
-            fontSize: '0.74rem',
-            fontWeight: '800',
-            padding: '4px 12px',
-            borderRadius: '9999px',
-            letterSpacing: '0.5px'
+
+          <p style={{
+            fontSize: '1rem',
+            color: '#CCFBF1',
+            margin: '0 0 32px 0',
+            fontWeight: '400'
           }}>
-            TEMPO REAL
-          </span>
-        </div>
+            Encontre rapidamente regras operacionais, colinhas e regulamentos oficiais da Estante Virtual.
+          </p>
 
-        {/* BOTÕES DE AÇÃO E FILTROS */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '10px' }}>
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-            {isSupervisor && (
-              <button
-                onClick={() => setModalPublicar(true)}
-                style={{
-                  backgroundColor: '#004D4C',
-                  color: '#FFFFFF',
-                  border: 'none',
-                  padding: '9px 18px',
-                  borderRadius: '9999px',
-                  fontSize: '0.86rem',
-                  fontWeight: '700',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  boxShadow: '0 2px 8px rgba(0, 77, 76, 0.2)'
-                }}
-              >
-                <span>🔒</span> Publicar Comunicado (Acesso Líder)
-              </button>
-            )}
-
+          {/* BARRA DE PESQUISA */}
+          <form
+            onSubmit={handleBuscaHero}
+            style={{
+              maxWidth: '680px',
+              margin: '0 auto 40px auto',
+              backgroundColor: '#FFFFFF',
+              borderRadius: '9999px',
+              display: 'flex',
+              alignItems: 'center',
+              padding: '6px 8px 6px 20px',
+              boxShadow: '0 8px 24px rgba(0, 40, 40, 0.18)'
+            }}
+          >
+            <span style={{ fontSize: '1.2rem', color: '#005856', marginRight: '10px' }}>🔍</span>
+            <input
+              type="text"
+              placeholder="Digite uma dúvida, erro, regra de frete, devolução ou PIX..."
+              value={buscaHero}
+              onChange={(e) => setBuscaHero(e.target.value)}
+              style={{
+                flex: 1,
+                border: 'none',
+                outline: 'none',
+                fontSize: '0.94rem',
+                color: '#1E293B'
+              }}
+            />
             <button
-              onClick={() => setFiltroAtivo('Todos')}
+              type="submit"
+              style={{
+                backgroundColor: '#005856',
+                color: '#FFFFFF',
+                border: 'none',
+                padding: '10px 26px',
+                borderRadius: '9999px',
+                fontSize: '0.9rem',
+                fontWeight: '700',
+                cursor: 'pointer',
+                transition: 'background-color 0.15s'
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#004240')}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#005856')}
+            >
+              Buscar
+            </button>
+          </form>
+
+          {/* OS 3 CARDS DE ACESSO RÁPIDO DO HERO */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(290px, 1fr))',
+            gap: '20px',
+            textAlign: 'left'
+          }}>
+            
+            {/* CARD COLINHAS */}
+            <div
+              onClick={() => setView('colinhas')}
               style={{
                 backgroundColor: '#FFFFFF',
-                color: '#006968',
-                border: '1.5px solid #006968',
-                padding: '8px 18px',
-                borderRadius: '9999px',
-                fontSize: '0.84rem',
-                fontWeight: '700',
-                cursor: 'pointer'
+                borderRadius: '18px',
+                padding: '22px 24px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '16px',
+                cursor: 'pointer',
+                boxShadow: '0 4px 14px rgba(0, 0, 0, 0.08)',
+                transition: 'transform 0.2s, box-shadow 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-3px)';
+                e.currentTarget.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.14)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 4px 14px rgba(0, 0, 0, 0.08)';
               }}
             >
-              Ver todos os avisos
-            </button>
-          </div>
-
-          {/* ABAS / FILTROS (TODOS, URGENTES, FIXADOS) */}
-          <div style={{ display: 'flex', gap: '8px' }}>
-            {[
-              { id: 'Todos', label: 'Todos' },
-              { id: 'Urgentes', label: 'Urgentes' },
-              { id: 'Fixados', label: 'Fixados' }
-            ].map((f) => (
-              <button
-                key={f.id}
-                onClick={() => setFiltroAtivo(f.id)}
-                style={{
-                  padding: '5px 16px',
-                  borderRadius: '9999px',
-                  border: '1px solid',
-                  borderColor: filtroAtivo === f.id ? '#006968' : '#CBD5E1',
-                  backgroundColor: filtroAtivo === f.id ? '#FFFFFF' : '#FFFFFF',
-                  color: filtroAtivo === f.id ? '#006968' : '#64748B',
-                  fontWeight: filtroAtivo === f.id ? '800' : '600',
-                  fontSize: '0.82rem',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                  boxShadow: filtroAtivo === f.id ? '0 1px 4px rgba(0, 105, 104, 0.15)' : 'none'
-                }}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* ÁREA CENTRAL DO MURAL COM ILUSTRAÇÕES DE FUNDO E OS CARDS EM FORMA DE LIVRO */}
-      <div style={{
-        position: 'relative',
-        minHeight: '440px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '20px 0'
-      }}>
-
-        {/* --- FUNDO ESQUERDO: LIVROS EM TRAÇO PRETO E BRANCO PADRONIZADOS --- */}
-        <div style={{
-          position: 'absolute',
-          left: '0px',
-          top: '50%',
-          transform: 'translateY(-50%)',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: '18px',
-          pointerEvents: 'none',
-          userSelect: 'none',
-          zIndex: 0
-        }}>
-          {/* Livro aberto em traços preto e branco */}
-          <img
-            src="/book.png"
-            alt="Livro Aberto Ilustração"
-            style={{
-              width: '135px',
-              opacity: 0.35,
-              filter: 'grayscale(100%) contrast(180%)'
-            }}
-          />
-          {/* Livro com marcador de página padronizado em traço P&B */}
-          <img
-            src="/book-1.png"
-            alt="Livro Ilustração"
-            style={{
-              width: '95px',
-              opacity: 0.35,
-              filter: 'grayscale(100%) contrast(180%)'
-            }}
-          />
-        </div>
-
-        {/* --- CARDS DOS LIVROS (COM TRANSIÇÃO SUAVE E ESTILOS ORIGINAIS) --- */}
-        <div
-          key={filtroAtivo}
-          className="animar-card-mural"
-          style={{
-            display: 'flex',
-            gap: '36px',
-            justifyContent: 'center',
-            alignItems: 'stretch',
-            flexWrap: 'wrap',
-            zIndex: 2,
-            width: '100%',
-            maxWidth: '1080px'
-          }}
-        >
-          {comunicadosFiltrados.length === 0 ? (
-            <div style={{
-              backgroundColor: '#FFFFFF',
-              borderRadius: '24px',
-              padding: '60px 40px',
-              textAlign: 'center',
-              border: '2px dashed #CBD5E1',
-              color: '#64748B',
-              width: '100%',
-              maxWidth: '560px'
-            }}>
-              Nenhum aviso encontrado para o filtro "{filtroAtivo}".
+              <div style={{
+                backgroundColor: '#E0F2FE',
+                width: '52px',
+                height: '52px',
+                borderRadius: '14px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '1.6rem',
+                flexShrink: 0
+              }}>
+                📝
+              </div>
+              <div>
+                <h3 style={{ margin: '0 0 4px 0', fontSize: '1.08rem', fontWeight: '800', color: '#004D4C' }}>
+                  Colinhas
+                </h3>
+                <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748B', lineHeight: '1.4' }}>
+                  Textos prontos e máscaras para copiar e responder rápido no ticket.
+                </p>
+              </div>
             </div>
-          ) : (
-            comunicadosFiltrados.map((item, index) => {
-              const isUrgente = item.tipo === 'URGENTE';
-              
-              // Cores originais dos livros: Verde Petróleo (Informativo) e Laranja/Terracota (Urgente)
-              const corCapa = isUrgente ? '#D97706' : '#00A896';
-              const corFita = isUrgente ? '#C0392B' : '#006968';
 
-              return (
-                <div
-                  key={item.id}
-                  onClick={() => setModalDetalhes(item)}
+            {/* CARD REGULAMENTOS */}
+            <div
+              onClick={() => setView('regulamentos')}
+              style={{
+                backgroundColor: '#FFFFFF',
+                borderRadius: '18px',
+                padding: '22px 24px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '16px',
+                cursor: 'pointer',
+                boxShadow: '0 4px 14px rgba(0, 0, 0, 0.08)',
+                transition: 'transform 0.2s, box-shadow 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-3px)';
+                e.currentTarget.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.14)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 4px 14px rgba(0, 0, 0, 0.08)';
+              }}
+            >
+              <div style={{
+                backgroundColor: '#FEF3C7',
+                width: '52px',
+                height: '52px',
+                borderRadius: '14px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '1.6rem',
+                flexShrink: 0
+              }}>
+                📜
+              </div>
+              <div>
+                <h3 style={{ margin: '0 0 4px 0', fontSize: '1.08rem', fontWeight: '800', color: '#004D4C' }}>
+                  Regulamentos
+                </h3>
+                <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748B', lineHeight: '1.4' }}>
+                  Regras de negócio, prazos do CDC e políticas de plataforma.
+                </p>
+              </div>
+            </div>
+
+            {/* CARD LINKS ÚTEIS */}
+            <div
+              onClick={() => setView('links')}
+              style={{
+                backgroundColor: '#FFFFFF',
+                borderRadius: '18px',
+                padding: '22px 24px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '16px',
+                cursor: 'pointer',
+                boxShadow: '0 4px 14px rgba(0, 0, 0, 0.08)',
+                transition: 'transform 0.2s, box-shadow 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-3px)';
+                e.currentTarget.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.14)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 4px 14px rgba(0, 0, 0, 0.08)';
+              }}
+            >
+              <div style={{
+                backgroundColor: '#F1F5F9',
+                width: '52px',
+                height: '52px',
+                borderRadius: '14px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '1.6rem',
+                flexShrink: 0
+              }}>
+                🔗
+              </div>
+              <div>
+                <h3 style={{ margin: '0 0 4px 0', fontSize: '1.08rem', fontWeight: '800', color: '#004D4C' }}>
+                  Links Úteis
+                </h3>
+                <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748B', lineHeight: '1.4' }}>
+                  Planilhas operacionais, sistemas (NCA/Zendesk) e formulários do time.
+                </p>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      {/* ========================================================
+          2. MURAL DE AVISOS OPERACIONAIS (COM LIVROS NO FUNDO)
+      ======================================================== */}
+      <section style={{ maxWidth: '1440px', margin: '0 auto', padding: '42px 32px 80px 32px' }}>
+        
+        {/* CABEÇALHO DO MURAL */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '16px',
+          marginBottom: '32px'
+        }}>
+          {/* TÍTULO E BADGE */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <span style={{ fontSize: '1.8rem' }}>📢</span>
+            <h2 style={{
+              margin: 0,
+              fontSize: '1.65rem',
+              fontWeight: '900',
+              color: '#005856',
+              letterSpacing: '-0.3px'
+            }}>
+              Mural de Avisos Operacionais
+            </h2>
+            <span style={{
+              backgroundColor: '#DCFCE7',
+              color: '#166534',
+              fontSize: '0.74rem',
+              fontWeight: '800',
+              padding: '4px 12px',
+              borderRadius: '9999px',
+              letterSpacing: '0.4px'
+            }}>
+              TEMPO REAL
+            </span>
+          </div>
+
+          {/* BOTÕES DE CONTROLE DO MURAL */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '10px' }}>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+              {isSupervisor && (
+                <button
+                  onClick={() => setModalPublicar(true)}
                   style={{
-                    backgroundColor: '#FFFFFF',
-                    borderRadius: '24px',
-                    border: `3px solid ${corCapa}`,
-                    width: '100%',
-                    maxWidth: '490px',
-                    minHeight: '340px',
-                    padding: '28px 32px',
-                    position: 'relative',
+                    backgroundColor: '#004D4C',
+                    color: '#FFFFFF',
+                    border: 'none',
+                    padding: '8px 18px',
+                    borderRadius: '9999px',
+                    fontSize: '0.84rem',
+                    fontWeight: '700',
                     cursor: 'pointer',
-                    boxShadow: '0 8px 24px rgba(0, 0, 0, 0.05)',
                     display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'space-between',
-                    transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-                    animationDelay: `${index * 0.06}s`
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-6px)';
-                    e.currentTarget.style.boxShadow = '0 16px 36px rgba(0, 0, 0, 0.1)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0px)';
-                    e.currentTarget.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.05)';
+                    alignItems: 'center',
+                    gap: '6px',
+                    boxShadow: '0 2px 6px rgba(0, 77, 76, 0.2)'
                   }}
                 >
-                  {/* FITA MARCADORA DE PÁGINA (RIBBON NO TOPO DO LIVRO) */}
-                  <div style={{
-                    position: 'absolute',
-                    top: '-14px',
-                    right: '34px',
-                    width: '32px',
-                    height: '52px',
-                    backgroundColor: corFita,
-                    borderRadius: '3px 3px 0 0',
-                    boxShadow: '0 3px 6px rgba(0,0,0,0.18)',
-                    clipPath: 'polygon(0 0, 100% 0, 100% 100%, 50% 82%, 0 100%)',
-                    zIndex: 10
-                  }} />
+                  <span>🔒</span> Publicar Comunicado (Acesso Líder)
+                </button>
+              )}
 
-                  {/* LINHAS DE FOLHAS NA LATERAL ESQUERDA (EFEITO LIVRO ABERTO) */}
-                  <div style={{
-                    position: 'absolute',
-                    left: '12px',
-                    top: '20px',
-                    bottom: '20px',
-                    width: '6px',
-                    borderLeft: '1.5px solid #CBD5E1',
-                    borderRight: '1.5px solid #E2E8F0',
-                    pointerEvents: 'none'
-                  }} />
+              <button
+                onClick={() => setFiltroAtivo('Todos')}
+                style={{
+                  backgroundColor: '#FFFFFF',
+                  color: '#006968',
+                  border: '1.5px solid #006968',
+                  padding: '7px 18px',
+                  borderRadius: '9999px',
+                  fontSize: '0.82rem',
+                  fontWeight: '700',
+                  cursor: 'pointer'
+                }}
+              >
+                Ver todos os avisos
+              </button>
+            </div>
 
-                  {/* CONTEÚDO DO CARD */}
-                  <div style={{ paddingLeft: '8px' }}>
-                    
-                    {/* LINHA DE TAGS (TIPO, STATUS, DEPARTAMENTO E FECHAR) */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-                        {/* TAG TIPO */}
-                        <span style={{
-                          backgroundColor: isUrgente ? '#FEE2E2' : '#E0F2FE',
-                          color: isUrgente ? '#991B1B' : '#0284C7',
-                          fontSize: '0.68rem',
-                          fontWeight: '800',
-                          padding: '3px 9px',
-                          borderRadius: '6px',
-                          letterSpacing: '0.5px'
-                        }}>
-                          {item.tipo}
-                        </span>
-
-                        {/* TAG STATUS */}
-                        <span style={{
-                          backgroundColor: item.status === 'SOLUCIONADO' ? '#DCFCE7' : '#FEF3C7',
-                          color: item.status === 'SOLUCIONADO' ? '#166534' : '#92400E',
-                          fontSize: '0.68rem',
-                          fontWeight: '800',
-                          padding: '3px 9px',
-                          borderRadius: '6px'
-                        }}>
-                          {item.status === 'SOLUCIONADO' ? '✓ SOLUCIONADO' : '⏳ EM ANDAMENTO'}
-                        </span>
-
-                        {/* TAG DEPARTAMENTO */}
-                        <span style={{
-                          backgroundColor: isUrgente ? '#FEF9C3' : '#CCFBF1',
-                          color: isUrgente ? '#854D0E' : '#0F766E',
-                          fontSize: '0.68rem',
-                          fontWeight: '800',
-                          padding: '3px 9px',
-                          borderRadius: '6px'
-                        }}>
-                          {item.departamento}
-                        </span>
-                      </div>
-
-                      {/* BOTÃO EXCLUIR (SUPERVISOR) */}
-                      {isSupervisor && (
-                        <button
-                          onClick={(e) => handleExcluirComunicado(e, item.id)}
-                          title="Remover aviso"
-                          style={{
-                            backgroundColor: '#FEE2E2',
-                            color: '#DC2626',
-                            border: 'none',
-                            width: '22px',
-                            height: '22px',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontWeight: '800',
-                            fontSize: '0.72rem'
-                          }}
-                        >
-                          ✕
-                        </button>
-                      )}
-                    </div>
-
-                    {/* TAG FIXADO */}
-                    {item.fixado && (
-                      <div style={{ marginBottom: '14px' }}>
-                        <span style={{
-                          backgroundColor: '#F1F5F9',
-                          color: '#475569',
-                          fontSize: '0.68rem',
-                          fontWeight: '800',
-                          padding: '2px 8px',
-                          borderRadius: '4px'
-                        }}>
-                          📌 FIXADO
-                        </span>
-                      </div>
-                    )}
-
-                    {/* TÍTULO DO AVISO */}
-                    <h3 style={{
-                      margin: '0 0 8px 0',
-                      fontSize: '1.25rem',
-                      fontWeight: '900',
-                      color: '#004D4C',
-                      lineHeight: '1.3'
-                    }}>
-                      {item.titulo}
-                    </h3>
-
-                    {/* METADADOS */}
-                    <div style={{
-                      fontSize: '0.8rem',
-                      color: '#64748B',
-                      marginBottom: '16px',
-                      fontWeight: '600'
-                    }}>
-                      Publicado às {item.horario} • {item.autor} • {item.departamento}
-                    </div>
-
-                    {/* TEXTO DO COMUNICADO */}
-                    <p style={{
-                      margin: 0,
-                      fontSize: '0.94rem',
-                      color: '#334155',
-                      lineHeight: '1.6'
-                    }}>
-                      {item.conteudo}
-                    </p>
-                  </div>
-
-                  {/* RODAPÉ DO CARD COM DIVISÓRIA PONTILHADA */}
-                  <div style={{
-                    marginTop: '22px',
-                    paddingTop: '14px',
-                    borderTop: '1px dotted #CBD5E1',
-                    textAlign: 'center'
-                  }}>
-                    <span style={{
-                      color: '#006968',
-                      fontSize: '0.86rem',
-                      fontWeight: '800',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '4px'
-                    }}>
-                      Clique para ver comunicado completo 🔍
-                    </span>
-                  </div>
-                </div>
-              );
-            })
-          )}
+            {/* ABAS DE FILTRO */}
+            <div style={{ display: 'flex', gap: '8px' }}>
+              {['Todos', 'Urgentes', 'Fixados'].map((f) => (
+                <button
+                  key={f}
+                  onClick={() => setFiltroAtivo(f)}
+                  style={{
+                    padding: '4px 16px',
+                    borderRadius: '9999px',
+                    border: '1px solid',
+                    borderColor: filtroAtivo === f ? '#006968' : '#CBD5E1',
+                    backgroundColor: '#FFFFFF',
+                    color: filtroAtivo === f ? '#006968' : '#64748B',
+                    fontWeight: filtroAtivo === f ? '800' : '600',
+                    fontSize: '0.82rem',
+                    cursor: 'pointer',
+                    boxShadow: filtroAtivo === f ? '0 1px 4px rgba(0, 105, 104, 0.15)' : 'none'
+                  }}
+                >
+                  {f}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
-        {/* --- FUNDO DIREITO: PILHA DE LIVROS EM TRAÇOS PRETO E BRANCO PADRONIZADOS --- */}
+        {/* CONTAINER DO MURAL COM OS LIVROS NO FUNDO */}
         <div style={{
-          position: 'absolute',
-          right: '0px',
-          top: '50%',
-          transform: 'translateY(-50%)',
-          pointerEvents: 'none',
-          userSelect: 'none',
-          zIndex: 0
+          position: 'relative',
+          minHeight: '440px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '10px 0'
         }}>
-          {/* Pilha de livros padronizada em traço P&B */}
-          <img
-            src="/stack-of-books.png"
-            alt="Pilha de Livros Ilustração"
+
+          {/* --- LIVROS NO FUNDO À ESQUERDA (EM LINHAS PRETO E BRANCO PADRÃO) --- */}
+          <div style={{
+            position: 'absolute',
+            left: '20px',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '24px',
+            pointerEvents: 'none',
+            userSelect: 'none',
+            zIndex: 0
+          }}>
+            <img
+              src="/book.png"
+              alt="Livro Aberto"
+              style={{
+                width: '130px',
+                opacity: 0.35,
+                filter: 'grayscale(100%) contrast(180%)'
+              }}
+            />
+            <img
+              src="/book (1).png"
+              onError={(e) => { e.currentTarget.src = '/book-1.png'; }}
+              alt="Livro Fechado"
+              style={{
+                width: '90px',
+                opacity: 0.35,
+                filter: 'grayscale(100%) contrast(180%)'
+              }}
+            />
+          </div>
+
+          {/* --- CARDS DOS LIVROS DO MURAL (CENTRAIS COM TRANSIÇÃO) --- */}
+          <div
+            key={filtroAtivo}
+            className="animar-mural"
             style={{
-              width: '160px',
-              opacity: 0.35,
-              filter: 'grayscale(100%) contrast(180%)'
+              display: 'flex',
+              gap: '32px',
+              justifyContent: 'center',
+              alignItems: 'stretch',
+              flexWrap: 'wrap',
+              zIndex: 2,
+              width: '100%',
+              maxWidth: '1040px'
             }}
-          />
+          >
+            {comunicadosFiltrados.length === 0 ? (
+              <div style={{
+                backgroundColor: '#FFFFFF',
+                borderRadius: '24px',
+                padding: '50px 30px',
+                textAlign: 'center',
+                border: '2px dashed #CBD5E1',
+                color: '#64748B',
+                width: '100%',
+                maxWidth: '520px'
+              }}>
+                Nenhum comunicado encontrado para o filtro selecionado.
+              </div>
+            ) : (
+              comunicadosFiltrados.map((item) => {
+                const isUrgente = item.tipo === 'URGENTE';
+                const corCapa = isUrgente ? '#D97706' : '#00A896';
+                const corFita = isUrgente ? '#C0392B' : '#006968';
+
+                return (
+                  <div
+                    key={item.id}
+                    onClick={() => setModalDetalhes(item)}
+                    style={{
+                      backgroundColor: '#FFFFFF',
+                      borderRadius: '24px',
+                      border: `3px solid ${corCapa}`,
+                      width: '100%',
+                      maxWidth: '490px',
+                      minHeight: '340px',
+                      padding: '28px 32px',
+                      position: 'relative',
+                      cursor: 'pointer',
+                      boxShadow: '0 8px 24px rgba(0, 0, 0, 0.05)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                      transition: 'all 0.22s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-5px)';
+                      e.currentTarget.style.boxShadow = '0 14px 32px rgba(0, 0, 0, 0.09)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.05)';
+                    }}
+                  >
+                    {/* FITA MARCADORA DE PÁGINA (RIBBON) */}
+                    <div style={{
+                      position: 'absolute',
+                      top: '-14px',
+                      right: '34px',
+                      width: '32px',
+                      height: '50px',
+                      backgroundColor: corFita,
+                      borderRadius: '3px 3px 0 0',
+                      boxShadow: '0 3px 6px rgba(0,0,0,0.18)',
+                      clipPath: 'polygon(0 0, 100% 0, 100% 100%, 50% 82%, 0 100%)',
+                      zIndex: 10
+                    }} />
+
+                    {/* LINHAS LATERAIS (PÁGINAS DO LIVRO) */}
+                    <div style={{
+                      position: 'absolute',
+                      left: '12px',
+                      top: '20px',
+                      bottom: '20px',
+                      width: '6px',
+                      borderLeft: '1.5px solid #CBD5E1',
+                      borderRight: '1.5px solid #E2E8F0',
+                      pointerEvents: 'none'
+                    }} />
+
+                    {/* CONTEÚDO */}
+                    <div style={{ paddingLeft: '8px' }}>
+                      
+                      {/* LINHA DE TAGS */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                          <span style={{
+                            backgroundColor: isUrgente ? '#FEE2E2' : '#E0F2FE',
+                            color: isUrgente ? '#991B1B' : '#0284C7',
+                            fontSize: '0.68rem',
+                            fontWeight: '800',
+                            padding: '3px 9px',
+                            borderRadius: '6px'
+                          }}>
+                            {item.tipo}
+                          </span>
+
+                          <span style={{
+                            backgroundColor: item.status === 'SOLUCIONADO' ? '#DCFCE7' : '#FEF3C7',
+                            color: item.status === 'SOLUCIONADO' ? '#166534' : '#92400E',
+                            fontSize: '0.68rem',
+                            fontWeight: '800',
+                            padding: '3px 9px',
+                            borderRadius: '6px'
+                          }}>
+                            {item.status === 'SOLUCIONADO' ? '✓ SOLUCIONADO' : '⏳ EM ANDAMENTO'}
+                          </span>
+
+                          <span style={{
+                            backgroundColor: isUrgente ? '#FEF9C3' : '#CCFBF1',
+                            color: isUrgente ? '#854D0E' : '#0F766E',
+                            fontSize: '0.68rem',
+                            fontWeight: '800',
+                            padding: '3px 9px',
+                            borderRadius: '6px'
+                          }}>
+                            {item.departamento}
+                          </span>
+                        </div>
+
+                        {/* EXCLUIR */}
+                        {isSupervisor && (
+                          <button
+                            onClick={(e) => handleExcluirComunicado(e, item.id)}
+                            title="Remover aviso"
+                            style={{
+                              backgroundColor: '#FEE2E2',
+                              color: '#DC2626',
+                              border: 'none',
+                              width: '22px',
+                              height: '22px',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontWeight: '800',
+                              fontSize: '0.72rem'
+                            }}
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
+
+                      {/* TAG FIXADO */}
+                      {item.fixado && (
+                        <div style={{ marginBottom: '12px' }}>
+                          <span style={{
+                            backgroundColor: '#F1F5F9',
+                            color: '#475569',
+                            fontSize: '0.68rem',
+                            fontWeight: '800',
+                            padding: '2px 8px',
+                            borderRadius: '4px'
+                          }}>
+                            📌 FIXADO
+                          </span>
+                        </div>
+                      )}
+
+                      {/* TÍTULO */}
+                      <h3 style={{
+                        margin: '0 0 8px 0',
+                        fontSize: '1.25rem',
+                        fontWeight: '900',
+                        color: '#004D4C',
+                        lineHeight: '1.3'
+                      }}>
+                        {item.titulo}
+                      </h3>
+
+                      {/* SUBTÍTULO */}
+                      <div style={{
+                        fontSize: '0.8rem',
+                        color: '#64748B',
+                        marginBottom: '16px',
+                        fontWeight: '600'
+                      }}>
+                        Publicado às {item.horario} • {item.autor} • {item.departamento}
+                      </div>
+
+                      {/* TEXTO */}
+                      <p style={{
+                        margin: 0,
+                        fontSize: '0.94rem',
+                        color: '#334155',
+                        lineHeight: '1.6'
+                      }}>
+                        {item.conteudo}
+                      </p>
+                    </div>
+
+                    {/* RODAPÉ DO CARD */}
+                    <div style={{
+                      marginTop: '22px',
+                      paddingTop: '14px',
+                      borderTop: '1px dotted #CBD5E1',
+                      textAlign: 'center'
+                    }}>
+                      <span style={{
+                        color: '#006968',
+                        fontSize: '0.86rem',
+                        fontWeight: '800',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}>
+                        Clique para ver comunicado completo 🔍
+                      </span>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* --- LIVROS NO FUNDO À DIREITA (PILHA EM LINHAS PRETO E BRANCO PADRÃO) --- */}
+          <div style={{
+            position: 'absolute',
+            right: '20px',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            pointerEvents: 'none',
+            userSelect: 'none',
+            zIndex: 0
+          }}>
+            <img
+              src="/stack-of-books.png"
+              alt="Pilha de Livros"
+              style={{
+                width: '155px',
+                opacity: 0.35,
+                filter: 'grayscale(100%) contrast(180%)'
+              }}
+            />
+          </div>
+
         </div>
+      </section>
 
-      </div>
-
-      {/* MODAL DETALHES DO COMUNICADO COMPLETO */}
+      {/* MODAL DETALHES DO COMUNICADO */}
       {modalDetalhes && (
         <div
           style={{
@@ -641,7 +865,7 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
         </div>
       )}
 
-      {/* MODAL PUBLICAR NOVO COMUNICADO (ACESSO LÍDER) */}
+      {/* MODAL PUBLICAR NOVO COMUNICADO */}
       {modalPublicar && (
         <div
           style={{
