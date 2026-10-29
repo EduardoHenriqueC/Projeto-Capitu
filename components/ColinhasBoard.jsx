@@ -15,7 +15,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
   // Modais
   const [modalAberto, setModalAberto] = useState(false);
   const [modalNota, setModalNota] = useState(null); 
-  const [colinhaParaExcluir, setColinhaParaExcluir] = useState(null); // Modal de confirmação de exclusão
+  const [colinhaParaExcluir, setColinhaParaExcluir] = useState(null);
   const [excluindo, setExcluindo] = useState(false);
 
   // Referências para o Ctrl+A inteligente
@@ -62,7 +62,6 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
 
   const [colinhas, setColinhas] = useState([]);
 
-  // Função auxiliar para exibir o toast formatado
   const dispararToast = (mensagem, tipo = 'sucesso') => {
     setToast({ visivel: true, mensagem, tipo });
     setTimeout(() => {
@@ -97,7 +96,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
     }
   };
 
-  // 2. DISPARA A BUSCA AO ABRIR E ATIVA REALTIME
+  // 2. DISPARA BUSCA AO INICIAR E ATIVA REALTIME
   useEffect(() => {
     buscarColinhas();
 
@@ -113,7 +112,6 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
     };
   }, []);
 
-  // Foco no modal para Ctrl+A
   useEffect(() => {
     if (modalNota && modalContainerRef.current) {
       modalContainerRef.current.focus();
@@ -161,7 +159,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
   };
 
   const abrirModalEditar = (e, item) => {
-    e.stopPropagation();
+    if (e) e.stopPropagation();
     setFormData({
       id: item.id,
       t: item.t,
@@ -239,7 +237,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
 
       if (error) throw error;
 
-      dispararToast(`🗑️ Colinha "${colinhaParaExcluir.t}" removida do banco!`, 'sucesso');
+      dispararToast(`Colinha "${colinhaParaExcluir.t}" removida!`, 'sucesso');
       setColinhaParaExcluir(null);
       await buscarColinhas();
     } catch (err) {
@@ -421,15 +419,15 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
                           {c.c}
                         </span>
 
-                        {/* BOTÕES DE SUPERVISOR (EDITAR + EXCLUIR) */}
+                        {/* BOTÕES DE SUPERVISOR NOS CARDS */}
                         {isSupervisor && (
                           <div style={{ display: 'flex', gap: '6px' }} onClick={(e) => e.stopPropagation()}>
                             <button
                               onClick={(e) => abrirModalEditar(e, c)}
                               title="Editar Colinha"
                               style={{
-                                background: '#FFF',
-                                border: '1px solid rgba(0, 0, 0, 0.15)',
+                                background: '#FFFFFF',
+                                border: '1px solid #CBD5E1',
                                 borderRadius: '6px',
                                 cursor: 'pointer',
                                 padding: '3px 8px',
@@ -442,25 +440,36 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
                               ✏️
                             </button>
 
+                            {/* BOTÃO '✕' MAIS AMIGÁVEL E DISCRETO */}
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setColinhaParaExcluir(c);
                               }}
-                              title="Excluir Colinha Definitivamente"
+                              title="Excluir Colinha"
                               style={{
-                                background: '#FEE2E2',
-                                border: '1px solid #FCA5A5',
+                                background: '#FFFFFF',
+                                border: '1px solid #CBD5E1',
                                 borderRadius: '6px',
                                 cursor: 'pointer',
                                 padding: '3px 8px',
-                                fontSize: '0.74rem',
-                                fontWeight: '700',
-                                color: '#991B1B',
+                                fontSize: '0.76rem',
+                                fontWeight: '800',
+                                color: '#64748B',
                                 transition: 'all 0.15s'
                               }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.background = '#FEE2E2';
+                                e.currentTarget.style.color = '#DC2626';
+                                e.currentTarget.style.borderColor = '#FCA5A5';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.background = '#FFFFFF';
+                                e.currentTarget.style.color = '#64748B';
+                                e.currentTarget.style.borderColor = '#CBD5E1';
+                              }}
                             >
-                              🗑️
+                              ✕
                             </button>
                           </div>
                         )}
@@ -485,7 +494,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
         </main>
       </div>
 
-      {/* MODAL EXPANDIDO DE LEITURA (CTRL+A INTELIGENTE) */}
+      {/* MODAL EXPANDIDO DE LEITURA (COM EDITAR E EXCLUIR EMBUTIDOS) */}
       {modalNota && (
         <div
           style={{
@@ -554,7 +563,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
                   color: '#64748B'
                 }}
               >
-                ✖
+                ✕
               </button>
             </div>
 
@@ -577,46 +586,90 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
               {compilarTexto(modalNota.txt, modalNota.c)}
             </div>
 
-            <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-              {isSupervisor && (
+            {/* BARRA DE AÇÕES INFERIOR DO MODAL EXPANDIDO */}
+            <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
+              <div>
+                {isSupervisor && (
+                  <button
+                    onClick={() => {
+                      const item = modalNota;
+                      setModalNota(null);
+                      setColinhaParaExcluir(item);
+                    }}
+                    style={{
+                      padding: '8px 16px',
+                      borderRadius: '8px',
+                      border: '1px solid #CBD5E1',
+                      background: '#FFFFFF',
+                      color: '#64748B',
+                      fontWeight: '700',
+                      cursor: 'pointer',
+                      fontSize: '0.85rem',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = '#FEE2E2';
+                      e.currentTarget.style.color = '#DC2626';
+                      e.currentTarget.style.borderColor = '#FCA5A5';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = '#FFFFFF';
+                      e.currentTarget.style.color = '#64748B';
+                      e.currentTarget.style.borderColor = '#CBD5E1';
+                    }}
+                  >
+                    ✕ Excluir
+                  </button>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px' }}>
+                {isSupervisor && (
+                  <button
+                    onClick={() => {
+                      const item = modalNota;
+                      setModalNota(null);
+                      abrirModalEditar(null, item);
+                    }}
+                    style={{
+                      padding: '8px 18px',
+                      borderRadius: '8px',
+                      border: '1px solid #CBD5E1',
+                      background: '#FFFFFF',
+                      color: '#334155',
+                      fontWeight: '700',
+                      cursor: 'pointer',
+                      fontSize: '0.86rem',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px'
+                    }}
+                  >
+                    ✏️ Editar Colinha
+                  </button>
+                )}
+
                 <button
                   onClick={() => {
-                    const item = modalNota;
-                    setModalNota(null);
-                    setColinhaParaExcluir(item);
+                    navigator.clipboard.writeText(compilarTexto(modalNota.txt, modalNota.c));
+                    dispararToast(`📋 Texto de "${modalNota.t}" copiado com sucesso!`, 'sucesso');
                   }}
                   style={{
-                    padding: '8px 16px',
+                    padding: '8px 22px',
                     borderRadius: '8px',
-                    border: '1px solid #FCA5A5',
-                    background: '#FEE2E2',
-                    color: '#991B1B',
+                    border: 'none',
+                    background: 'var(--ev-teal-primary)',
+                    color: '#FFF',
                     fontWeight: '700',
                     cursor: 'pointer',
-                    fontSize: '0.85rem'
+                    fontSize: '0.86rem'
                   }}
                 >
-                  🗑️ Excluir
+                  Copiar Tudo
                 </button>
-              )}
-
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(compilarTexto(modalNota.txt, modalNota.c));
-                  dispararToast(`📋 Texto de "${modalNota.t}" copiado com sucesso!`, 'sucesso');
-                }}
-                style={{
-                  padding: '8px 22px',
-                  borderRadius: '8px',
-                  border: 'none',
-                  background: 'var(--ev-teal-primary)',
-                  color: '#FFF',
-                  fontWeight: '700',
-                  cursor: 'pointer'
-                }}
-              >
-                Copiar Tudo
-              </button>
+              </div>
             </div>
           </div>
         </div>
@@ -662,7 +715,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
         </div>
       )}
 
-      {/* MODAL DE CONFIRMAÇÃO DE EXCLUSÃO (SEM ALERT/CONFIRM NATIVO) */}
+      {/* MODAL DE CONFIRMAÇÃO DE EXCLUSÃO CLEAN */}
       {colinhaParaExcluir && (
         <div style={{
           position: 'fixed',
@@ -679,20 +732,36 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
             background: '#FFFFFF',
             borderRadius: '16px',
             width: '100%',
-            maxWidth: '440px',
+            maxWidth: '420px',
             padding: '26px',
             boxShadow: '0 20px 40px rgba(0, 0, 0, 0.25)',
             textAlign: 'center'
           }}>
-            <div style={{ fontSize: '2.5rem', marginBottom: '10px' }}>🗑️</div>
-            <h3 style={{ margin: '0 0 8px 0', color: '#991B1B', fontSize: '1.25rem', fontWeight: '800' }}>
+            <div style={{
+              width: '44px',
+              height: '44px',
+              borderRadius: '50%',
+              background: '#F1F5F9',
+              color: '#64748B',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '1.2rem',
+              fontWeight: '800',
+              margin: '0 auto 12px auto'
+            }}>
+              ✕
+            </div>
+            
+            <h3 style={{ margin: '0 0 8px 0', color: 'var(--text-dark)', fontSize: '1.2rem', fontWeight: '800' }}>
               Remover Colinha?
             </h3>
-            <p style={{ margin: '0 0 20px 0', color: '#475569', fontSize: '0.9rem', lineHeight: '1.5' }}>
-              Tem certeza de que deseja excluir permanentemente a colinha <strong>"{colinhaParaExcluir.t}"</strong>? Ela deixará de aparecer para todos os atendentes.
+            
+            <p style={{ margin: '0 0 20px 0', color: '#64748B', fontSize: '0.9rem', lineHeight: '1.5' }}>
+              Deseja remover <strong>"{colinhaParaExcluir.t}"</strong>? Ela será excluída permanentemente do banco de dados.
             </p>
 
-            <div style={{ display: 'flex', justifyContent: 'center', gap: '12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '10px' }}>
               <button
                 type="button"
                 disabled={excluindo}
@@ -714,17 +783,17 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
                 disabled={excluindo}
                 onClick={confirmarExclusao}
                 style={{
-                  padding: '9px 22px',
+                  padding: '9px 20px',
                   borderRadius: '8px',
                   border: 'none',
-                  background: '#DC2626',
+                  background: '#0F172A',
                   color: '#FFFFFF',
-                  fontWeight: '800',
+                  fontWeight: '700',
                   cursor: excluindo ? 'not-allowed' : 'pointer',
                   opacity: excluindo ? 0.7 : 1
                 }}
               >
-                {excluindo ? 'Excluindo...' : 'Sim, excluir'}
+                {excluindo ? 'Removendo...' : 'Confirmar remoção'}
               </button>
             </div>
           </div>
