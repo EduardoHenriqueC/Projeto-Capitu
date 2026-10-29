@@ -3,15 +3,20 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 
-export default function ColinhasBoard({ isSupervisor, usuarioLogado}) {
+export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
   const [agente, setAgente] = useState('');
   const [isMounted, setIsMounted] = useState(false);
   const [categoriaAtiva, setCategoriaAtiva] = useState('Todas as Colinhas');
   const [termoBusca, setTermoBusca] = useState('');
-  const [toast, setToast] = useState({ visivel: false, mensagem: '' });
   
+  // Toast elegante (sucesso / erro)
+  const [toast, setToast] = useState({ visivel: false, mensagem: '', tipo: 'sucesso' });
+  
+  // Modais
   const [modalAberto, setModalAberto] = useState(false);
   const [modalNota, setModalNota] = useState(null); 
+  const [colinhaParaExcluir, setColinhaParaExcluir] = useState(null); // Modal de confirmação de exclusão
+  const [excluindo, setExcluindo] = useState(false);
 
   // Referências para o Ctrl+A inteligente
   const modalContainerRef = useRef(null);
@@ -21,6 +26,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado}) {
     id: null,
     t: '',
     c: '🚫 Cancelamento',
+    atalho: '',
     txt: ''
   });
 
@@ -56,7 +62,15 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado}) {
 
   const [colinhas, setColinhas] = useState([]);
 
-  // 1. FUNÇÃO QUE BUSCA AS COLINHAS NO BANCO DO SUPABASE
+  // Função auxiliar para exibir o toast formatado
+  const dispararToast = (mensagem, tipo = 'sucesso') => {
+    setToast({ visivel: true, mensagem, tipo });
+    setTimeout(() => {
+      setToast({ visivel: false, mensagem: '', tipo: 'sucesso' });
+    }, 2800);
+  };
+
+  // 1. BUSCA AS COLINHAS NO BANCO DO SUPABASE
   const buscarColinhas = async () => {
     try {
       const { data, error } = await supabase
@@ -67,9 +81,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado}) {
 
       if (error) throw error;
 
-      if (data && data.length > 0) {
-        // Converte os nomes das colunas do Supabase (titulo, categoria, conteudo)
-        // para os nomes que seu componente usa (t, c, txt)
+      if (data) {
         setColinhas(
           data.map((item) => ({
             id: item.id,
@@ -85,11 +97,10 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado}) {
     }
   };
 
-  // 2. DISPARA A BUSCA AO ABRIR A PÁGINA E ATIVA O REALTIME
+  // 2. DISPARA A BUSCA AO ABRIR E ATIVA REALTIME
   useEffect(() => {
     buscarColinhas();
 
-    // Sincronização em tempo real (qualquer alteração atualiza a tela na hora)
     const canal = supabase
       .channel('colinhas_realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'colinhas' }, () => {
@@ -102,7 +113,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado}) {
     };
   }, []);
 
-  // Foco automático no modal quando ele é aberto para permitir o Ctrl+A imediato
+  // Foco no modal para Ctrl+A
   useEffect(() => {
     if (modalNota && modalContainerRef.current) {
       modalContainerRef.current.focus();
@@ -123,7 +134,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado}) {
 
   const compilarTexto = (template, categoria) => {
     const nome = agente.trim();
-    let final = template;
+    let final = template || '';
 
     if (nome) {
       final = final.replace(/{agente}/gi, nome);
@@ -161,18 +172,17 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado}) {
     setModalAberto(true);
   };
 
+  // 3. SALVAR (CRIAÇÃO OU ATUALIZAÇÃO)
   const salvarColinha = async (e) => {
     e.preventDefault();
 
-    // Validação básica dos campos obrigatórios
     if (!formData.t.trim() || !formData.txt.trim()) {
-      alert('Preencha o título e o conteúdo da colinha.');
+      dispararToast('Por favor, preencha o título e o texto da colinha.', 'erro');
       return;
     }
 
     try {
       if (formData.id) {
-        // --- MODO EDIÇÃO: Atualiza o registro existente no Supabase ---
         const { error } = await supabase
           .from('colinhas')
           .update({
@@ -185,9 +195,12 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado}) {
           .eq('id', formData.id);
 
         if (error) throw error;
-        alert('✅ Colinha atualizada com sucesso no banco!');
+        dispararToast('✅ Colinha atualizada com sucesso no banco!', 'sucesso');
       } else {
-        // --- MODO CRIAÇÃO: Insere um novo registro no Supabase ---
+        const autor = (typeof usuarioLogado !== 'undefined' && usuarioLogado?.nome)
+          ? usuarioLogado.nome
+          : 'Supervisão EV';
+
         const { error } = await supabase
           .from('colinhas')
           .insert([
@@ -196,32 +209,55 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado}) {
               categoria: formData.c,
               conteudo: formData.txt,
               atalho: formData.atalho || '',
-              autor_nome: (typeof usuarioLogado !== 'undefined' && usuarioLogado?.nome) 
-              ? usuarioLogado.nome 
-              : 'Supervisão EV'
+              autor_nome: autor
             }
           ]);
 
         if (error) throw error;
-        alert('✨ Nova colinha salva com sucesso no banco!');
+        dispararToast('✨ Nova colinha cadastrada com sucesso!', 'sucesso');
       }
 
-      // Fecha o modal e recarrega a listagem direto do Supabase
       setModalAberto(false);
       setFormData({ id: null, t: '', c: '🗣️ Relacionamento', atalho: '', txt: '' });
       await buscarColinhas();
     } catch (err) {
       console.error('Erro ao salvar no Supabase:', err);
-      alert('Erro ao gravar no banco: ' + err.message);
+      dispararToast('Falha ao salvar no banco: ' + err.message, 'erro');
+    }
+  };
+
+  // 4. EXCLUIR DEFINITIVAMENTE DO SUPABASE
+  const confirmarExclusao = async () => {
+    if (!colinhaParaExcluir) return;
+
+    setExcluindo(true);
+    try {
+      const { error } = await supabase
+        .from('colinhas')
+        .delete()
+        .eq('id', colinhaParaExcluir.id);
+
+      if (error) throw error;
+
+      dispararToast(`🗑️ Colinha "${colinhaParaExcluir.t}" removida do banco!`, 'sucesso');
+      setColinhaParaExcluir(null);
+      await buscarColinhas();
+    } catch (err) {
+      console.error('Erro ao excluir no Supabase:', err);
+      dispararToast('Erro ao excluir colinha: ' + err.message, 'erro');
+    } finally {
+      setExcluindo(false);
     }
   };
 
   const colinhasFiltradas = colinhas.filter((c) => {
     const bateCategoria = categoriaAtiva === 'Todas as Colinhas' || c.c === categoriaAtiva;
+    const termo = termoBusca.toLowerCase().trim();
     const bateBusca =
-      termoBusca.trim() === '' ||
-      c.t.toLowerCase().includes(termoBusca.toLowerCase()) ||
-      c.txt.toLowerCase().includes(termoBusca.toLowerCase());
+      termo === '' ||
+      c.t.toLowerCase().includes(termo) ||
+      c.txt.toLowerCase().includes(termo) ||
+      (c.atalho && c.atalho.toLowerCase().includes(termo));
     return bateCategoria && bateBusca;
   });
 
@@ -246,7 +282,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado}) {
           <span style={{ fontSize: '1.25rem', color: 'var(--ev-teal-primary)' }}>🔍</span>
           <input
             type="text"
-            placeholder="Pesquise por qualquer termo, SLA, regra de frete, devolução..."
+            placeholder="Pesquise por qualquer termo, atalho (/pix), regra de frete, cancelamento..."
             value={termoBusca}
             onChange={(e) => setTermoBusca(e.target.value)}
             style={{
@@ -271,7 +307,22 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado}) {
           />  
 
           {isSupervisor && (
-            <button onClick={abrirModalCriar} style={{ background: 'var(--ev-teal-primary)', color: '#FFF', border: 'none', padding: '9px 16px', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}>
+            <button
+              onClick={abrirModalCriar}
+              style={{
+                background: 'var(--ev-teal-primary)',
+                color: '#FFF',
+                border: 'none',
+                padding: '9px 18px',
+                borderRadius: '8px',
+                fontWeight: '700',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                boxShadow: '0 2px 6px rgba(0, 105, 104, 0.25)'
+              }}
+            >
               ➕ Nova
             </button>
           )}
@@ -281,7 +332,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado}) {
       {/* LAYOUT: MENU LATERAL + CONTEÚDO */}
       <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: '28px', alignItems: 'start' }}>
         
-        {/* MENU LATERAL COM BARRA DE ROLAGEM INDEPENDENTE */}
+        {/* MENU LATERAL */}
         <aside style={{ 
           display: 'flex', 
           flexDirection: 'column', 
@@ -313,18 +364,6 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado}) {
                   fontWeight: isAtiva ? '800' : '600',
                   fontSize: '0.9rem'
                 }}
-                onMouseEnter={(e) => {
-                  if (!isAtiva) {
-                    e.currentTarget.style.background = '#FFFFFF';
-                    e.currentTarget.style.border = '1px solid var(--border-subtle)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isAtiva) {
-                    e.currentTarget.style.background = 'transparent';
-                    e.currentTarget.style.border = '1px solid transparent';
-                  }
-                }}
               >
                 <div style={{ fontSize: '1.2rem', width: '28px', textAlign: 'center' }}>{cat.icone}</div>
                 <div>{cat.nome}</div>
@@ -333,14 +372,14 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado}) {
           })}
         </aside>
 
-        {/* ÁREA DOS CARDS ESTILO GOOGLE KEEP */}
+        {/* ÁREA DOS CARDS */}
         <main style={{ minHeight: '600px' }}>
           <div style={{ marginBottom: '20px' }}>
             <h2 style={{ fontSize: '1.4rem', fontWeight: '800', color: 'var(--ev-teal-dark)', margin: '0 0 6px 0' }}>
               {categoriaAtiva}
             </h2>
             <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-muted)' }}>
-              {colinhasFiltradas.length} {colinhasFiltradas.length === 1 ? 'colinha disponível' : 'colinhas disponíveis'}. Clique no card para abrir e selecionar o texto.
+              {colinhasFiltradas.length} {colinhasFiltradas.length === 1 ? 'colinha disponível' : 'colinhas disponíveis'}. Clique no card para expandir ou copiar o texto.
             </p>
           </div>
 
@@ -357,7 +396,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado}) {
                   return (
                     <div
                       key={c.id}
-                      onClick={() => setModalNota(c)} // TODAS AS NOTAS ABREM EM MODAL
+                      onClick={() => setModalNota(c)}
                       style={{
                         backgroundColor: cores.bg,
                         border: `1px solid ${cores.border}`,
@@ -381,16 +420,55 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado}) {
                         <span style={{ fontSize: '0.7rem', fontWeight: '800', textTransform: 'uppercase', color: 'rgba(0, 0, 0, 0.5)', letterSpacing: '0.5px' }}>
                           {c.c}
                         </span>
+
+                        {/* BOTÕES DE SUPERVISOR (EDITAR + EXCLUIR) */}
                         {isSupervisor && (
-                          <button onClick={(e) => abrirModalEditar(e, c)} style={{ background: '#FFF', border: '1px solid rgba(0, 0, 0, 0.15)', borderRadius: '6px', cursor: 'pointer', padding: '2px 8px', fontSize: '0.75rem' }}>
-                            ✏️ Editar
-                          </button>
+                          <div style={{ display: 'flex', gap: '6px' }} onClick={(e) => e.stopPropagation()}>
+                            <button
+                              onClick={(e) => abrirModalEditar(e, c)}
+                              title="Editar Colinha"
+                              style={{
+                                background: '#FFF',
+                                border: '1px solid rgba(0, 0, 0, 0.15)',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                padding: '3px 8px',
+                                fontSize: '0.74rem',
+                                fontWeight: '700',
+                                color: '#334155',
+                                transition: 'all 0.15s'
+                              }}
+                            >
+                              ✏️
+                            </button>
+
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setColinhaParaExcluir(c);
+                              }}
+                              title="Excluir Colinha Definitivamente"
+                              style={{
+                                background: '#FEE2E2',
+                                border: '1px solid #FCA5A5',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                padding: '3px 8px',
+                                fontSize: '0.74rem',
+                                fontWeight: '700',
+                                color: '#991B1B',
+                                transition: 'all 0.15s'
+                              }}
+                            >
+                              🗑️
+                            </button>
+                          </div>
                         )}
                       </div>
                       
                       <h4 style={{ margin: '0 0 12px 0', fontSize: '1rem', color: 'var(--text-dark)', fontWeight: '800' }}>{c.t}</h4>
                       
-                      <div style={{ fontSize: '0.86rem', color: '#334155', lineHeight: '1.6', whiteSpace: 'pre-wrap', maxHeight: '200px', overflowY: 'hidden', position: 'relative' }}>
+                      <div style={{ fontSize: '0.86rem', color: '#334155', lineHeight: '1.6', whiteSpace: 'pre-wrap', maxHeight: '180px', overflowY: 'hidden', position: 'relative' }}>
                         {compilarTexto(c.txt, c.c)}
                         <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '36px', background: `linear-gradient(transparent, ${cores.bg})` }}></div>
                       </div>
@@ -407,7 +485,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado}) {
         </main>
       </div>
 
-      {/* MODAL EXPANDIDO ESTILO GOOGLE KEEP COM PROTEÇÃO DE CTRL+A */}
+      {/* MODAL EXPANDIDO DE LEITURA (CTRL+A INTELIGENTE) */}
       {modalNota && (
         <div
           style={{
@@ -427,7 +505,6 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado}) {
             ref={modalContainerRef}
             tabIndex={0}
             onKeyDown={(e) => {
-              // Intercepta Ctrl+A (ou Cmd+A) para selecionar APENAS o texto do modal
               if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
                 e.preventDefault();
                 const selection = window.getSelection();
@@ -448,11 +525,10 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado}) {
               display: 'flex',
               flexDirection: 'column',
               border: `2px solid ${getCor(modalNota.c).border}`,
-              outline: 'none' // Evita borda azul feia de foco no Chrome
+              outline: 'none'
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* CABEÇALHO DO MODAL */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
               <div>
                 <span style={{ fontSize: '0.75rem', fontWeight: '800', textTransform: 'uppercase', color: 'var(--ev-teal-primary)', letterSpacing: '0.5px' }}>
@@ -482,7 +558,6 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado}) {
               </button>
             </div>
 
-            {/* CORPO DO TEXTO (ONDE O CTRL+A VAI ATUAR) */}
             <div
               ref={modalTextRef}
               style={{
@@ -502,16 +577,36 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado}) {
               {compilarTexto(modalNota.txt, modalNota.c)}
             </div>
 
-            {/* BARRA DE AÇÕES INFERIOR MINIMALISTA */}
-            <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end' }}>
+            <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              {isSupervisor && (
+                <button
+                  onClick={() => {
+                    const item = modalNota;
+                    setModalNota(null);
+                    setColinhaParaExcluir(item);
+                  }}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    border: '1px solid #FCA5A5',
+                    background: '#FEE2E2',
+                    color: '#991B1B',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                    fontSize: '0.85rem'
+                  }}
+                >
+                  🗑️ Excluir
+                </button>
+              )}
+
               <button
                 onClick={() => {
                   navigator.clipboard.writeText(compilarTexto(modalNota.txt, modalNota.c));
-                  setToast({ visivel: true, mensagem: `📋 Texto completo de "${modalNota.t}" copiado!` });
-                  setTimeout(() => setToast({ visivel: false, mensagem: '' }), 2500);
+                  dispararToast(`📋 Texto de "${modalNota.t}" copiado com sucesso!`, 'sucesso');
                 }}
                 style={{
-                  padding: '8px 20px',
+                  padding: '8px 22px',
                   borderRadius: '8px',
                   border: 'none',
                   background: 'var(--ev-teal-primary)',
@@ -527,7 +622,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado}) {
         </div>
       )}
 
-      {/* MODAL SUPERVISOR (CRIAR/EDITAR) */}
+      {/* MODAL CRIAR / EDITAR */}
       {modalAberto && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 30, 30, 0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1300, padding: '20px' }}>
           <div style={{ background: '#FFFFFF', borderRadius: '16px', width: '100%', maxWidth: '560px', padding: '28px', boxShadow: 'var(--shadow-lg)' }}>
@@ -535,35 +630,130 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado}) {
             <form onSubmit={salvarColinha}>
               <div style={{ marginBottom: '12px' }}>
                 <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '700', marginBottom: '4px' }}>Título</label>
-                <input type="text" required value={formData.t} onChange={(e) => setFormData({ ...formData, t: e.target.value })} style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E1' }} />
+                <input type="text" required value={formData.t} onChange={(e) => setFormData({ ...formData, t: e.target.value })} style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #CBD5E1', outline: 'none' }} />
               </div>
-              <div style={{ marginBottom: '12px' }}>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '700', marginBottom: '4px' }}>Categoria</label>
-                <select value={formData.c} onChange={(e) => setFormData({ ...formData, c: e.target.value })} style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E1', background: '#FFF' }}>
-                  {categoriasBase.filter(cat => cat.id !== 'Todas as Colinhas').map(cat => (
-                    <option key={cat.id} value={cat.id}>{cat.id} - {cat.nome}</option>
-                  ))}
-                </select>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '10px', marginBottom: '12px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '700', marginBottom: '4px' }}>Categoria</label>
+                  <select value={formData.c} onChange={(e) => setFormData({ ...formData, c: e.target.value })} style={{ width: '100%', padding: '9px', borderRadius: '6px', border: '1px solid #CBD5E1', background: '#FFF' }}>
+                    {categoriasBase.filter(cat => cat.id !== 'Todas as Colinhas').map(cat => (
+                      <option key={cat.id} value={cat.id}>{cat.nome}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '700', marginBottom: '4px' }}>Atalho (opcional)</label>
+                  <input type="text" placeholder="/exemplo" value={formData.atalho} onChange={(e) => setFormData({ ...formData, atalho: e.target.value })} style={{ width: '100%', padding: '9px', borderRadius: '6px', border: '1px solid #CBD5E1', outline: 'none' }} />
+                </div>
               </div>
+
               <div style={{ marginBottom: '16px' }}>
                 <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '700', marginBottom: '4px' }}>Texto da Colinha</label>
-                <textarea rows="7" required value={formData.txt} onChange={(e) => setFormData({ ...formData, txt: e.target.value })} style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '0.88rem', lineHeight: '1.5' }} />
+                <textarea rows="7" required value={formData.txt} onChange={(e) => setFormData({ ...formData, txt: e.target.value })} style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '0.88rem', lineHeight: '1.5', outline: 'none' }} />
               </div>
+
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
                 <button type="button" onClick={() => setModalAberto(false)} style={{ padding: '8px 16px', borderRadius: '6px', border: 'none', background: '#F1F5F9', cursor: 'pointer', fontWeight: '600' }}>Cancelar</button>
-                <button type="submit" style={{ padding: '8px 18px', borderRadius: '6px', border: 'none', background: 'var(--ev-teal-primary)', color: '#FFF', fontWeight: '700', cursor: 'pointer' }}>Salvar</button>
+                <button type="submit" style={{ padding: '8px 20px', borderRadius: '6px', border: 'none', background: 'var(--ev-teal-primary)', color: '#FFF', fontWeight: '700', cursor: 'pointer' }}>Salvar no Banco</button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* FEEDBACK TOAST */}
+      {/* MODAL DE CONFIRMAÇÃO DE EXCLUSÃO (SEM ALERT/CONFIRM NATIVO) */}
+      {colinhaParaExcluir && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0, 20, 20, 0.7)',
+          backdropFilter: 'blur(3px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1500,
+          padding: '20px'
+        }}>
+          <div style={{
+            background: '#FFFFFF',
+            borderRadius: '16px',
+            width: '100%',
+            maxWidth: '440px',
+            padding: '26px',
+            boxShadow: '0 20px 40px rgba(0, 0, 0, 0.25)',
+            textAlign: 'center'
+          }}>
+            <div style={{ fontSize: '2.5rem', marginBottom: '10px' }}>🗑️</div>
+            <h3 style={{ margin: '0 0 8px 0', color: '#991B1B', fontSize: '1.25rem', fontWeight: '800' }}>
+              Remover Colinha?
+            </h3>
+            <p style={{ margin: '0 0 20px 0', color: '#475569', fontSize: '0.9rem', lineHeight: '1.5' }}>
+              Tem certeza de que deseja excluir permanentemente a colinha <strong>"{colinhaParaExcluir.t}"</strong>? Ela deixará de aparecer para todos os atendentes.
+            </p>
+
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '12px' }}>
+              <button
+                type="button"
+                disabled={excluindo}
+                onClick={() => setColinhaParaExcluir(null)}
+                style={{
+                  padding: '9px 18px',
+                  borderRadius: '8px',
+                  border: '1px solid #CBD5E1',
+                  background: '#FFFFFF',
+                  color: '#475569',
+                  fontWeight: '700',
+                  cursor: 'pointer'
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={excluindo}
+                onClick={confirmarExclusao}
+                style={{
+                  padding: '9px 22px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: '#DC2626',
+                  color: '#FFFFFF',
+                  fontWeight: '800',
+                  cursor: excluindo ? 'not-allowed' : 'pointer',
+                  opacity: excluindo ? 0.7 : 1
+                }}
+              >
+                {excluindo ? 'Excluindo...' : 'Sim, excluir'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* FEEDBACK TOAST ESTILIZADO */}
       {toast.visivel && (
-        <div style={{ position: 'fixed', bottom: '24px', right: '24px', background: 'var(--ev-teal-dark)', color: '#FFFFFF', padding: '12px 22px', borderRadius: 'var(--radius-pill)', border: '1px solid var(--ev-turquoise)', zIndex: 1400, fontWeight: '700', boxShadow: 'var(--shadow-md)' }}>
+        <div style={{
+          position: 'fixed',
+          bottom: '28px',
+          right: '28px',
+          background: toast.tipo === 'erro' ? '#991B1B' : 'var(--ev-teal-dark)',
+          color: '#FFFFFF',
+          padding: '13px 24px',
+          borderRadius: '9999px',
+          border: `1.5px solid ${toast.tipo === 'erro' ? '#FCA5A5' : 'var(--ev-turquoise)'}`,
+          zIndex: 2000,
+          fontWeight: '700',
+          fontSize: '0.92rem',
+          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.2)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
           {toast.mensagem}
         </div>
       )}
+
     </div>
   );
 }
