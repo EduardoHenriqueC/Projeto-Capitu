@@ -429,28 +429,6 @@ export default function ColinhasBoard({ isSupervisor }) {
     }
   };
 
-
-    {/* BOTÃO TEMPORÁRIO DE CARGA INICIAL */}
-    {isSupervisor && (
-    <button
-    type="button"
-    onClick={handleMigrarColinhasParaSupabase}
-    style={{
-      backgroundColor: '#FEF3C7',
-      color: '#92400E',
-      border: '1.5px dashed #D97706',
-      padding: '8px 16px',
-      borderRadius: '8px',
-      cursor: 'pointer',
-      fontWeight: '800',
-      fontSize: '0.85rem',
-      marginRight: '10px'
-    }}
-  >
-    📥 Migrar Colinhas para o Banco
-  </button>
-)}
-
   const salvarColinha = (e) => {
     e.preventDefault();
     if (formData.id) {
@@ -517,6 +495,28 @@ export default function ColinhasBoard({ isSupervisor }) {
             onChange={handleAgenteChange}
             style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '0.9rem', width: '160px' }}
           />
+
+              {/* BOTÃO TEMPORÁRIO DE CARGA INICIAL */}
+          {isSupervisor && (
+          <button
+         type="button"
+          onClick={handleMigrarColinhasParaSupabase}
+         style={{
+         backgroundColor: '#FEF3C7',
+         color: '#92400E',
+         border: '1.5px dashed #D97706',
+          padding: '8px 16px',
+          borderRadius: '8px',
+          cursor: 'pointer',
+          fontWeight: '800',
+          fontSize: '0.85rem',
+          marginRight: '10px'
+            }}
+  > 
+            📥 Migrar Colinhas para o Banco
+            </button>
+          )}      
+
           {isSupervisor && (
             <button onClick={abrirModalCriar} style={{ background: 'var(--ev-teal-primary)', color: '#FFF', border: 'none', padding: '9px 16px', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}>
               ➕ Nova
