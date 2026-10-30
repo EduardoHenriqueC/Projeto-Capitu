@@ -142,7 +142,7 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
   });
 
   return (
-    <div style={{ width: '100%', minHeight: '100vh', backgroundColor: '#F7F7F4' }}>
+    <div style={{ width: '100%', minHeight: '100vh', backgroundColor: '#F8F5EC' }}>
       
       {/* TRANSIÇÃO SUAVE */}
       <style jsx>{`
@@ -162,11 +162,11 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
       `}</style>
 
       {/* ========================================================
-          1. HERO HEADER VERDE AMPLO (PROPORÇÃO DA IMAGEM 1)
+          1. HERO HEADER VERDE COMPLETO
       ======================================================== */}
       <section style={{
         backgroundColor: '#005452',
-        padding: '68px 32px 76px 32px',
+        padding: '64px 32px 70px 32px',
         textAlign: 'center',
         color: '#FFFFFF'
       }}>
@@ -184,7 +184,7 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
           <p style={{
             fontSize: '1.05rem',
             color: '#CCFBF1',
-            margin: '0 0 36px 0',
+            margin: '0 0 34px 0',
             fontWeight: '400'
           }}>
             Encontre rapidamente regras operacionais, colinhas e regulamentos oficiais da Estante Virtual.
@@ -195,7 +195,7 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
             onSubmit={handleBuscaHero}
             style={{
               maxWidth: '720px',
-              margin: '0 auto 46px auto',
+              margin: '0 auto 40px auto',
               backgroundColor: '#FFFFFF',
               borderRadius: '9999px',
               display: 'flex',
@@ -238,7 +238,7 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
             </button>
           </form>
 
-          {/* CARDS SUPERIORES AMPLIADOS (TAMANHO MAIOR) */}
+          {/* CARDS DE ATALHO COM ALTURA LEVEMENTE REDUZIDA */}
           <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
@@ -251,43 +251,43 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
               onClick={() => setView('colinhas')}
               style={{
                 backgroundColor: '#FFFFFF',
-                borderRadius: '20px',
-                padding: '26px 28px',
+                borderRadius: '18px',
+                padding: '18px 24px',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '18px',
+                gap: '16px',
                 cursor: 'pointer',
-                minHeight: '120px',
-                boxShadow: '0 6px 18px rgba(0, 0, 0, 0.08)',
+                minHeight: '102px',
+                boxShadow: '0 5px 16px rgba(0, 0, 0, 0.08)',
                 transition: 'transform 0.2s, box-shadow 0.2s'
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.transform = 'translateY(-3px)';
-                e.currentTarget.style.boxShadow = '0 10px 26px rgba(0, 0, 0, 0.14)';
+                e.currentTarget.style.boxShadow = '0 10px 24px rgba(0, 0, 0, 0.14)';
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 6px 18px rgba(0, 0, 0, 0.08)';
+                e.currentTarget.style.boxShadow = '0 5px 16px rgba(0, 0, 0, 0.08)';
               }}
             >
               <div style={{
                 backgroundColor: '#E0F2FE',
-                width: '56px',
-                height: '56px',
-                borderRadius: '16px',
+                width: '50px',
+                height: '50px',
+                borderRadius: '14px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '1.75rem',
+                fontSize: '1.6rem',
                 flexShrink: 0
               }}>
                 📝
               </div>
               <div>
-                <h3 style={{ margin: '0 0 5px 0', fontSize: '1.18rem', fontWeight: '800', color: '#004D4C' }}>
+                <h3 style={{ margin: '0 0 3px 0', fontSize: '1.14rem', fontWeight: '800', color: '#004D4C' }}>
                   Colinhas
                 </h3>
-                <p style={{ margin: 0, fontSize: '0.88rem', color: '#64748B', lineHeight: '1.45' }}>
+                <p style={{ margin: 0, fontSize: '0.86rem', color: '#64748B', lineHeight: '1.4' }}>
                   Textos prontos e máscaras para copiar e responder rápido no ticket.
                 </p>
               </div>
@@ -298,43 +298,43 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
               onClick={() => setView('regulamentos')}
               style={{
                 backgroundColor: '#FFFFFF',
-                borderRadius: '20px',
-                padding: '26px 28px',
+                borderRadius: '18px',
+                padding: '18px 24px',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '18px',
+                gap: '16px',
                 cursor: 'pointer',
-                minHeight: '120px',
-                boxShadow: '0 6px 18px rgba(0, 0, 0, 0.08)',
+                minHeight: '102px',
+                boxShadow: '0 5px 16px rgba(0, 0, 0, 0.08)',
                 transition: 'transform 0.2s, box-shadow 0.2s'
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.transform = 'translateY(-3px)';
-                e.currentTarget.style.boxShadow = '0 10px 26px rgba(0, 0, 0, 0.14)';
+                e.currentTarget.style.boxShadow = '0 10px 24px rgba(0, 0, 0, 0.14)';
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 6px 18px rgba(0, 0, 0, 0.08)';
+                e.currentTarget.style.boxShadow = '0 5px 16px rgba(0, 0, 0, 0.08)';
               }}
             >
               <div style={{
                 backgroundColor: '#FEF3C7',
-                width: '56px',
-                height: '56px',
-                borderRadius: '16px',
+                width: '50px',
+                height: '50px',
+                borderRadius: '14px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '1.75rem',
+                fontSize: '1.6rem',
                 flexShrink: 0
               }}>
                 📜
               </div>
               <div>
-                <h3 style={{ margin: '0 0 5px 0', fontSize: '1.18rem', fontWeight: '800', color: '#004D4C' }}>
+                <h3 style={{ margin: '0 0 3px 0', fontSize: '1.14rem', fontWeight: '800', color: '#004D4C' }}>
                   Regulamentos
                 </h3>
-                <p style={{ margin: 0, fontSize: '0.88rem', color: '#64748B', lineHeight: '1.45' }}>
+                <p style={{ margin: 0, fontSize: '0.86rem', color: '#64748B', lineHeight: '1.4' }}>
                   Regras de negócio, prazos do CDC e políticas de plataforma.
                 </p>
               </div>
@@ -345,43 +345,43 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
               onClick={() => setView('links')}
               style={{
                 backgroundColor: '#FFFFFF',
-                borderRadius: '20px',
-                padding: '26px 28px',
+                borderRadius: '18px',
+                padding: '18px 24px',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '18px',
+                gap: '16px',
                 cursor: 'pointer',
-                minHeight: '120px',
-                boxShadow: '0 6px 18px rgba(0, 0, 0, 0.08)',
+                minHeight: '102px',
+                boxShadow: '0 5px 16px rgba(0, 0, 0, 0.08)',
                 transition: 'transform 0.2s, box-shadow 0.2s'
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.transform = 'translateY(-3px)';
-                e.currentTarget.style.boxShadow = '0 10px 26px rgba(0, 0, 0, 0.14)';
+                e.currentTarget.style.boxShadow = '0 10px 24px rgba(0, 0, 0, 0.14)';
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 6px 18px rgba(0, 0, 0, 0.08)';
+                e.currentTarget.style.boxShadow = '0 5px 16px rgba(0, 0, 0, 0.08)';
               }}
             >
               <div style={{
                 backgroundColor: '#F1F5F9',
-                width: '56px',
-                height: '56px',
-                borderRadius: '16px',
+                width: '50px',
+                height: '50px',
+                borderRadius: '14px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '1.75rem',
+                fontSize: '1.6rem',
                 flexShrink: 0
               }}>
                 🔗
               </div>
               <div>
-                <h3 style={{ margin: '0 0 5px 0', fontSize: '1.18rem', fontWeight: '800', color: '#004D4C' }}>
+                <h3 style={{ margin: '0 0 3px 0', fontSize: '1.14rem', fontWeight: '800', color: '#004D4C' }}>
                   Links Úteis
                 </h3>
-                <p style={{ margin: 0, fontSize: '0.88rem', color: '#64748B', lineHeight: '1.45' }}>
+                <p style={{ margin: 0, fontSize: '0.86rem', color: '#64748B', lineHeight: '1.4' }}>
                   Planilhas operacionais, sistemas (NCA/Zendesk) e formulários do time.
                 </p>
               </div>
@@ -392,23 +392,23 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
       </section>
 
       {/* ========================================================
-          2. MURAL DE AVISOS COM FUNDO OFF-WHITE (#F7F7F4)
+          2. MURAL DE AVISOS COM FUNDO WARM PAPER (#F8F5EC)
       ======================================================== */}
       <section style={{
         maxWidth: '1440px',
         margin: '0 auto',
-        padding: '44px 32px 88px 32px',
-        backgroundColor: '#F7F7F4'
+        padding: '36px 32px 80px 32px',
+        backgroundColor: '#F8F5EC'
       }}>
         
-        {/* CABEÇALHO DO MURAL */}
+        {/* CABEÇALHO DO MURAL (MARGEM INFERIOR ENCURTADA PARA SUBIR OS CARDS) */}
         <div style={{
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
           flexWrap: 'wrap',
-          gap: '16px',
-          marginBottom: '34px'
+          gap: '14px',
+          marginBottom: '16px'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <span style={{ fontSize: '1.85rem' }}>📢</span>
@@ -434,7 +434,7 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
             </span>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '10px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
             <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
               {isSupervisor && (
                 <button
@@ -443,9 +443,9 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
                     backgroundColor: '#004D4C',
                     color: '#FFFFFF',
                     border: 'none',
-                    padding: '9px 20px',
+                    padding: '8px 18px',
                     borderRadius: '9999px',
-                    fontSize: '0.85rem',
+                    fontSize: '0.84rem',
                     fontWeight: '700',
                     cursor: 'pointer',
                     display: 'flex',
@@ -464,9 +464,9 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
                   backgroundColor: '#FFFFFF',
                   color: '#006968',
                   border: '1.5px solid #006968',
-                  padding: '8px 20px',
+                  padding: '7px 18px',
                   borderRadius: '9999px',
-                  fontSize: '0.84rem',
+                  fontSize: '0.82rem',
                   fontWeight: '700',
                   cursor: 'pointer'
                 }}
@@ -482,14 +482,14 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
                   key={f}
                   onClick={() => setFiltroAtivo(f)}
                   style={{
-                    padding: '5px 18px',
+                    padding: '4px 16px',
                     borderRadius: '9999px',
                     border: '1px solid',
                     borderColor: filtroAtivo === f ? '#006968' : '#CBD5E1',
                     backgroundColor: '#FFFFFF',
                     color: filtroAtivo === f ? '#006968' : '#64748B',
                     fontWeight: filtroAtivo === f ? '800' : '600',
-                    fontSize: '0.84rem',
+                    fontSize: '0.82rem',
                     cursor: 'pointer',
                     boxShadow: filtroAtivo === f ? '0 1px 4px rgba(0, 105, 104, 0.15)' : 'none'
                   }}
@@ -501,14 +501,14 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
           </div>
         </div>
 
-        {/* CONTAINER DOS LIVROS DO MURAL */}
+        {/* CONTAINER DO MURAL (SUBIDO MAIS PERTO DOS FILTROS) */}
         <div style={{
           position: 'relative',
           minHeight: '440px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          padding: '12px 0'
+          padding: '2px 0 10px 0'
         }}>
 
           {/* LIVROS DE FUNDO À ESQUERDA (P&B) */}
@@ -546,7 +546,7 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
             />
           </div>
 
-          {/* CARDS COM AS BORDAS E PÁGINAS DA IMAGEM 3 */}
+          {/* CARDS COM AS 4 LINHAS DE PÁGINAS ESCALONADAS */}
           <div
             key={filtroAtivo}
             className="animar-mural"
@@ -588,11 +588,11 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
                       backgroundColor: '#FFFFFF',
                       borderRadius: '24px',
                       border: `3px solid ${corCapa}`,
-                      borderLeft: `13px solid ${corCapa}`, /* LOMBADA GROSSA DA IMAGEM 3 */
+                      borderLeft: `13px solid ${corCapa}`,
                       width: '100%',
                       maxWidth: '510px',
                       minHeight: '350px',
-                      padding: '28px 30px 24px 44px', /* RESPIRO PARA AS 4 LINHAS */
+                      padding: '28px 30px 24px 44px',
                       position: 'relative',
                       cursor: 'pointer',
                       boxShadow: '0 8px 24px rgba(0, 0, 0, 0.05)',
@@ -610,7 +610,7 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
                       e.currentTarget.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.05)';
                     }}
                   >
-                    {/* FITA MARCADORA DE PÁGINA (TOPO DIREITO) */}
+                    {/* FITA MARCADORA */}
                     <div style={{
                       position: 'absolute',
                       top: '-14px',
@@ -624,7 +624,7 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
                       zIndex: 10
                     }} />
 
-                    {/* AS 4 LINHAS VERTICAIS ESCALONADAS (EXATAMENTE COMO NA IMAGEM 3) */}
+                    {/* 4 LINHAS DE PÁGINAS ESCALONADAS */}
                     <div style={{
                       position: 'absolute',
                       left: '16px',
@@ -640,7 +640,7 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
                       <div style={{ width: '2px', backgroundColor: '#B8A89A', marginTop: '16px', borderRadius: '1px' }} />
                     </div>
 
-                    {/* CONTEÚDO DO CARD */}
+                    {/* CONTEÚDO */}
                     <div>
                       {/* LINHA DE TAGS */}
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
@@ -679,7 +679,7 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
                           </span>
                         </div>
 
-                        {/* EXCLUIR (SUPERVISOR) */}
+                        {/* EXCLUIR */}
                         {isSupervisor && (
                           <button
                             onClick={(e) => handleExcluirComunicado(e, item.id)}
