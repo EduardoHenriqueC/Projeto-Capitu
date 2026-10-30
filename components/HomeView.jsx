@@ -535,7 +535,7 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
               }}
             />
             <img
-              src="/book (1).png"
+              src="/book-1.png"
               onError={(e) => { e.currentTarget.src = '/book-1.png'; }}
               alt="Livro Fechado"
               style={{
