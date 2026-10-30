@@ -33,7 +33,6 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
       if (!error && data && data.length > 0) {
         setComunicados(data);
       } else {
-        // Dados padrão idênticos ao painel em tela
         setComunicados([
           {
             id: 1,
@@ -79,13 +78,11 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
     };
   }, []);
 
-  // 2. DISPARAR BUSCA DO HERO PARA AS COLINHAS
   const handleBuscaHero = (e) => {
     e.preventDefault();
     setView('colinhas');
   };
 
-  // 3. PUBLICAR COMUNICADO
   const handleSalvarComunicado = async (e) => {
     e.preventDefault();
     if (!formAviso.titulo.trim() || !formAviso.conteudo.trim()) return;
@@ -125,7 +122,6 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
     }
   };
 
-  // 4. EXCLUIR COMUNICADO DO MURAL
   const handleExcluirComunicado = async (e, id) => {
     e.stopPropagation();
     if (!window.confirm('Deseja remover este comunicado do mural?')) return;
@@ -139,7 +135,6 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
     }
   };
 
-  // Filtros
   const comunicadosFiltrados = comunicados.filter((c) => {
     if (filtroAtivo === 'Urgentes') return c.tipo === 'URGENTE';
     if (filtroAtivo === 'Fixados') return c.fixado;
@@ -147,50 +142,49 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
   });
 
   return (
-    <div style={{ width: '100%', minHeight: '100vh', backgroundColor: '#F8FAFC' }}>
+    <div style={{ width: '100%', minHeight: '100vh', backgroundColor: '#F7F7F4' }}>
       
-      {/* KEYFRAMES DE TRANSIÇÃO SUAVE */}
+      {/* TRANSIÇÃO SUAVE */}
       <style jsx>{`
-        @keyframes fadeCard {
+        @keyframes fadeMural {
           from {
             opacity: 0;
-            transform: translateY(10px) scale(0.99);
+            transform: translateY(8px);
           }
           to {
             opacity: 1;
-            transform: translateY(0) scale(1);
+            transform: translateY(0);
           }
         }
         .animar-mural {
-          animation: fadeCard 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          animation: fadeMural 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
       `}</style>
 
       {/* ========================================================
-          1. HERO HEADER VERDE COMPLETO (EXATAMENTE COMO NA FOTO)
+          1. HERO HEADER VERDE AMPLO (PROPORÇÃO DA IMAGEM 1)
       ======================================================== */}
       <section style={{
-        backgroundColor: '#005856',
-        padding: '54px 24px 60px 24px',
+        backgroundColor: '#005452',
+        padding: '68px 32px 76px 32px',
         textAlign: 'center',
         color: '#FFFFFF'
       }}>
-        <div style={{ maxWidth: '1180px', margin: '0 auto' }}>
+        <div style={{ maxWidth: '1240px', margin: '0 auto' }}>
           
-          {/* TÍTULO PRINCIPAL */}
           <h1 style={{
-            fontSize: '2.5rem',
+            fontSize: '2.7rem',
             fontWeight: '900',
-            margin: '0 0 10px 0',
-            letterSpacing: '-0.5px'
+            margin: '0 0 12px 0',
+            letterSpacing: '-0.6px'
           }}>
             Qual a leitura <span style={{ color: '#5EEAD4' }}>de hoje?</span>
           </h1>
 
           <p style={{
-            fontSize: '1rem',
+            fontSize: '1.05rem',
             color: '#CCFBF1',
-            margin: '0 0 32px 0',
+            margin: '0 0 36px 0',
             fontWeight: '400'
           }}>
             Encontre rapidamente regras operacionais, colinhas e regulamentos oficiais da Estante Virtual.
@@ -200,17 +194,17 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
           <form
             onSubmit={handleBuscaHero}
             style={{
-              maxWidth: '680px',
-              margin: '0 auto 40px auto',
+              maxWidth: '720px',
+              margin: '0 auto 46px auto',
               backgroundColor: '#FFFFFF',
               borderRadius: '9999px',
               display: 'flex',
               alignItems: 'center',
-              padding: '6px 8px 6px 20px',
-              boxShadow: '0 8px 24px rgba(0, 40, 40, 0.18)'
+              padding: '7px 8px 7px 24px',
+              boxShadow: '0 8px 26px rgba(0, 35, 35, 0.22)'
             }}
           >
-            <span style={{ fontSize: '1.2rem', color: '#005856', marginRight: '10px' }}>🔍</span>
+            <span style={{ fontSize: '1.25rem', color: '#005452', marginRight: '12px' }}>🔍</span>
             <input
               type="text"
               placeholder="Digite uma dúvida, erro, regra de frete, devolução ou PIX..."
@@ -220,35 +214,35 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
                 flex: 1,
                 border: 'none',
                 outline: 'none',
-                fontSize: '0.94rem',
+                fontSize: '0.96rem',
                 color: '#1E293B'
               }}
             />
             <button
               type="submit"
               style={{
-                backgroundColor: '#005856',
+                backgroundColor: '#005452',
                 color: '#FFFFFF',
                 border: 'none',
-                padding: '10px 26px',
+                padding: '11px 28px',
                 borderRadius: '9999px',
-                fontSize: '0.9rem',
+                fontSize: '0.92rem',
                 fontWeight: '700',
                 cursor: 'pointer',
                 transition: 'background-color 0.15s'
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#004240')}
-              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#005856')}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#003E3C')}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#005452')}
             >
               Buscar
             </button>
           </form>
 
-          {/* OS 3 CARDS DE ACESSO RÁPIDO DO HERO */}
+          {/* CARDS SUPERIORES AMPLIADOS (TAMANHO MAIOR) */}
           <div style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(290px, 1fr))',
-            gap: '20px',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+            gap: '24px',
             textAlign: 'left'
           }}>
             
@@ -257,42 +251,43 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
               onClick={() => setView('colinhas')}
               style={{
                 backgroundColor: '#FFFFFF',
-                borderRadius: '18px',
-                padding: '22px 24px',
+                borderRadius: '20px',
+                padding: '26px 28px',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '16px',
+                gap: '18px',
                 cursor: 'pointer',
-                boxShadow: '0 4px 14px rgba(0, 0, 0, 0.08)',
+                minHeight: '120px',
+                boxShadow: '0 6px 18px rgba(0, 0, 0, 0.08)',
                 transition: 'transform 0.2s, box-shadow 0.2s'
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.transform = 'translateY(-3px)';
-                e.currentTarget.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.14)';
+                e.currentTarget.style.boxShadow = '0 10px 26px rgba(0, 0, 0, 0.14)';
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 4px 14px rgba(0, 0, 0, 0.08)';
+                e.currentTarget.style.boxShadow = '0 6px 18px rgba(0, 0, 0, 0.08)';
               }}
             >
               <div style={{
                 backgroundColor: '#E0F2FE',
-                width: '52px',
-                height: '52px',
-                borderRadius: '14px',
+                width: '56px',
+                height: '56px',
+                borderRadius: '16px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '1.6rem',
+                fontSize: '1.75rem',
                 flexShrink: 0
               }}>
                 📝
               </div>
               <div>
-                <h3 style={{ margin: '0 0 4px 0', fontSize: '1.08rem', fontWeight: '800', color: '#004D4C' }}>
+                <h3 style={{ margin: '0 0 5px 0', fontSize: '1.18rem', fontWeight: '800', color: '#004D4C' }}>
                   Colinhas
                 </h3>
-                <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748B', lineHeight: '1.4' }}>
+                <p style={{ margin: 0, fontSize: '0.88rem', color: '#64748B', lineHeight: '1.45' }}>
                   Textos prontos e máscaras para copiar e responder rápido no ticket.
                 </p>
               </div>
@@ -303,42 +298,43 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
               onClick={() => setView('regulamentos')}
               style={{
                 backgroundColor: '#FFFFFF',
-                borderRadius: '18px',
-                padding: '22px 24px',
+                borderRadius: '20px',
+                padding: '26px 28px',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '16px',
+                gap: '18px',
                 cursor: 'pointer',
-                boxShadow: '0 4px 14px rgba(0, 0, 0, 0.08)',
+                minHeight: '120px',
+                boxShadow: '0 6px 18px rgba(0, 0, 0, 0.08)',
                 transition: 'transform 0.2s, box-shadow 0.2s'
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.transform = 'translateY(-3px)';
-                e.currentTarget.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.14)';
+                e.currentTarget.style.boxShadow = '0 10px 26px rgba(0, 0, 0, 0.14)';
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 4px 14px rgba(0, 0, 0, 0.08)';
+                e.currentTarget.style.boxShadow = '0 6px 18px rgba(0, 0, 0, 0.08)';
               }}
             >
               <div style={{
                 backgroundColor: '#FEF3C7',
-                width: '52px',
-                height: '52px',
-                borderRadius: '14px',
+                width: '56px',
+                height: '56px',
+                borderRadius: '16px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '1.6rem',
+                fontSize: '1.75rem',
                 flexShrink: 0
               }}>
                 📜
               </div>
               <div>
-                <h3 style={{ margin: '0 0 4px 0', fontSize: '1.08rem', fontWeight: '800', color: '#004D4C' }}>
+                <h3 style={{ margin: '0 0 5px 0', fontSize: '1.18rem', fontWeight: '800', color: '#004D4C' }}>
                   Regulamentos
                 </h3>
-                <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748B', lineHeight: '1.4' }}>
+                <p style={{ margin: 0, fontSize: '0.88rem', color: '#64748B', lineHeight: '1.45' }}>
                   Regras de negócio, prazos do CDC e políticas de plataforma.
                 </p>
               </div>
@@ -349,42 +345,43 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
               onClick={() => setView('links')}
               style={{
                 backgroundColor: '#FFFFFF',
-                borderRadius: '18px',
-                padding: '22px 24px',
+                borderRadius: '20px',
+                padding: '26px 28px',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '16px',
+                gap: '18px',
                 cursor: 'pointer',
-                boxShadow: '0 4px 14px rgba(0, 0, 0, 0.08)',
+                minHeight: '120px',
+                boxShadow: '0 6px 18px rgba(0, 0, 0, 0.08)',
                 transition: 'transform 0.2s, box-shadow 0.2s'
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.transform = 'translateY(-3px)';
-                e.currentTarget.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.14)';
+                e.currentTarget.style.boxShadow = '0 10px 26px rgba(0, 0, 0, 0.14)';
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 4px 14px rgba(0, 0, 0, 0.08)';
+                e.currentTarget.style.boxShadow = '0 6px 18px rgba(0, 0, 0, 0.08)';
               }}
             >
               <div style={{
                 backgroundColor: '#F1F5F9',
-                width: '52px',
-                height: '52px',
-                borderRadius: '14px',
+                width: '56px',
+                height: '56px',
+                borderRadius: '16px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '1.6rem',
+                fontSize: '1.75rem',
                 flexShrink: 0
               }}>
                 🔗
               </div>
               <div>
-                <h3 style={{ margin: '0 0 4px 0', fontSize: '1.08rem', fontWeight: '800', color: '#004D4C' }}>
+                <h3 style={{ margin: '0 0 5px 0', fontSize: '1.18rem', fontWeight: '800', color: '#004D4C' }}>
                   Links Úteis
                 </h3>
-                <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748B', lineHeight: '1.4' }}>
+                <p style={{ margin: 0, fontSize: '0.88rem', color: '#64748B', lineHeight: '1.45' }}>
                   Planilhas operacionais, sistemas (NCA/Zendesk) e formulários do time.
                 </p>
               </div>
@@ -395,9 +392,14 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
       </section>
 
       {/* ========================================================
-          2. MURAL DE AVISOS OPERACIONAIS (COM LIVROS NO FUNDO)
+          2. MURAL DE AVISOS COM FUNDO OFF-WHITE (#F7F7F4)
       ======================================================== */}
-      <section style={{ maxWidth: '1440px', margin: '0 auto', padding: '42px 32px 80px 32px' }}>
+      <section style={{
+        maxWidth: '1440px',
+        margin: '0 auto',
+        padding: '44px 32px 88px 32px',
+        backgroundColor: '#F7F7F4'
+      }}>
         
         {/* CABEÇALHO DO MURAL */}
         <div style={{
@@ -406,16 +408,15 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
           alignItems: 'center',
           flexWrap: 'wrap',
           gap: '16px',
-          marginBottom: '32px'
+          marginBottom: '34px'
         }}>
-          {/* TÍTULO E BADGE */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '1.8rem' }}>📢</span>
+            <span style={{ fontSize: '1.85rem' }}>📢</span>
             <h2 style={{
               margin: 0,
-              fontSize: '1.65rem',
+              fontSize: '1.75rem',
               fontWeight: '900',
-              color: '#005856',
+              color: '#005452',
               letterSpacing: '-0.3px'
             }}>
               Mural de Avisos Operacionais
@@ -433,7 +434,6 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
             </span>
           </div>
 
-          {/* BOTÕES DE CONTROLE DO MURAL */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '10px' }}>
             <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
               {isSupervisor && (
@@ -443,9 +443,9 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
                     backgroundColor: '#004D4C',
                     color: '#FFFFFF',
                     border: 'none',
-                    padding: '8px 18px',
+                    padding: '9px 20px',
                     borderRadius: '9999px',
-                    fontSize: '0.84rem',
+                    fontSize: '0.85rem',
                     fontWeight: '700',
                     cursor: 'pointer',
                     display: 'flex',
@@ -464,9 +464,9 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
                   backgroundColor: '#FFFFFF',
                   color: '#006968',
                   border: '1.5px solid #006968',
-                  padding: '7px 18px',
+                  padding: '8px 20px',
                   borderRadius: '9999px',
-                  fontSize: '0.82rem',
+                  fontSize: '0.84rem',
                   fontWeight: '700',
                   cursor: 'pointer'
                 }}
@@ -475,21 +475,21 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
               </button>
             </div>
 
-            {/* ABAS DE FILTRO */}
+            {/* FILTROS */}
             <div style={{ display: 'flex', gap: '8px' }}>
               {['Todos', 'Urgentes', 'Fixados'].map((f) => (
                 <button
                   key={f}
                   onClick={() => setFiltroAtivo(f)}
                   style={{
-                    padding: '4px 16px',
+                    padding: '5px 18px',
                     borderRadius: '9999px',
                     border: '1px solid',
                     borderColor: filtroAtivo === f ? '#006968' : '#CBD5E1',
                     backgroundColor: '#FFFFFF',
                     color: filtroAtivo === f ? '#006968' : '#64748B',
                     fontWeight: filtroAtivo === f ? '800' : '600',
-                    fontSize: '0.82rem',
+                    fontSize: '0.84rem',
                     cursor: 'pointer',
                     boxShadow: filtroAtivo === f ? '0 1px 4px rgba(0, 105, 104, 0.15)' : 'none'
                   }}
@@ -501,20 +501,20 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
           </div>
         </div>
 
-        {/* CONTAINER DO MURAL COM OS LIVROS NO FUNDO */}
+        {/* CONTAINER DOS LIVROS DO MURAL */}
         <div style={{
           position: 'relative',
           minHeight: '440px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          padding: '10px 0'
+          padding: '12px 0'
         }}>
 
-          {/* --- LIVROS NO FUNDO À ESQUERDA (EM LINHAS PRETO E BRANCO PADRÃO) --- */}
+          {/* LIVROS DE FUNDO À ESQUERDA (P&B) */}
           <div style={{
             position: 'absolute',
-            left: '20px',
+            left: '10px',
             top: '50%',
             transform: 'translateY(-50%)',
             display: 'flex',
@@ -529,7 +529,7 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
               src="/book.png"
               alt="Livro Aberto"
               style={{
-                width: '130px',
+                width: '135px',
                 opacity: 0.35,
                 filter: 'grayscale(100%) contrast(180%)'
               }}
@@ -539,26 +539,26 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
               onError={(e) => { e.currentTarget.src = '/book-1.png'; }}
               alt="Livro Fechado"
               style={{
-                width: '90px',
+                width: '95px',
                 opacity: 0.35,
                 filter: 'grayscale(100%) contrast(180%)'
               }}
             />
           </div>
 
-          {/* --- CARDS DOS LIVROS DO MURAL (CENTRAIS COM TRANSIÇÃO) --- */}
+          {/* CARDS COM AS BORDAS E PÁGINAS DA IMAGEM 3 */}
           <div
             key={filtroAtivo}
             className="animar-mural"
             style={{
               display: 'flex',
-              gap: '32px',
+              gap: '36px',
               justifyContent: 'center',
               alignItems: 'stretch',
               flexWrap: 'wrap',
               zIndex: 2,
               width: '100%',
-              maxWidth: '1040px'
+              maxWidth: '1100px'
             }}
           >
             {comunicadosFiltrados.length === 0 ? (
@@ -578,7 +578,7 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
               comunicadosFiltrados.map((item) => {
                 const isUrgente = item.tipo === 'URGENTE';
                 const corCapa = isUrgente ? '#D97706' : '#00A896';
-                const corFita = isUrgente ? '#C0392B' : '#006968';
+                const corFita = isUrgente ? '#C0392B' : '#005856';
 
                 return (
                   <div
@@ -588,10 +588,11 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
                       backgroundColor: '#FFFFFF',
                       borderRadius: '24px',
                       border: `3px solid ${corCapa}`,
+                      borderLeft: `13px solid ${corCapa}`, /* LOMBADA GROSSA DA IMAGEM 3 */
                       width: '100%',
-                      maxWidth: '490px',
-                      minHeight: '340px',
-                      padding: '28px 32px',
+                      maxWidth: '510px',
+                      minHeight: '350px',
+                      padding: '28px 30px 24px 44px', /* RESPIRO PARA AS 4 LINHAS */
                       position: 'relative',
                       cursor: 'pointer',
                       boxShadow: '0 8px 24px rgba(0, 0, 0, 0.05)',
@@ -609,13 +610,13 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
                       e.currentTarget.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.05)';
                     }}
                   >
-                    {/* FITA MARCADORA DE PÁGINA (RIBBON) */}
+                    {/* FITA MARCADORA DE PÁGINA (TOPO DIREITO) */}
                     <div style={{
                       position: 'absolute',
                       top: '-14px',
                       right: '34px',
                       width: '32px',
-                      height: '50px',
+                      height: '52px',
                       backgroundColor: corFita,
                       borderRadius: '3px 3px 0 0',
                       boxShadow: '0 3px 6px rgba(0,0,0,0.18)',
@@ -623,21 +624,24 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
                       zIndex: 10
                     }} />
 
-                    {/* LINHAS LATERAIS (PÁGINAS DO LIVRO) */}
+                    {/* AS 4 LINHAS VERTICAIS ESCALONADAS (EXATAMENTE COMO NA IMAGEM 3) */}
                     <div style={{
                       position: 'absolute',
-                      left: '12px',
+                      left: '16px',
                       top: '20px',
                       bottom: '20px',
-                      width: '6px',
-                      borderLeft: '1.5px solid #CBD5E1',
-                      borderRight: '1.5px solid #E2E8F0',
+                      display: 'flex',
+                      gap: '5px',
                       pointerEvents: 'none'
-                    }} />
+                    }}>
+                      <div style={{ width: '2px', backgroundColor: '#B8A89A', marginTop: '0px', borderRadius: '1px' }} />
+                      <div style={{ width: '2px', backgroundColor: '#B8A89A', marginTop: '5px', borderRadius: '1px' }} />
+                      <div style={{ width: '2px', backgroundColor: '#B8A89A', marginTop: '10px', borderRadius: '1px' }} />
+                      <div style={{ width: '2px', backgroundColor: '#B8A89A', marginTop: '16px', borderRadius: '1px' }} />
+                    </div>
 
-                    {/* CONTEÚDO */}
-                    <div style={{ paddingLeft: '8px' }}>
-                      
+                    {/* CONTEÚDO DO CARD */}
+                    <div>
                       {/* LINHA DE TAGS */}
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -675,7 +679,7 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
                           </span>
                         </div>
 
-                        {/* EXCLUIR */}
+                        {/* EXCLUIR (SUPERVISOR) */}
                         {isSupervisor && (
                           <button
                             onClick={(e) => handleExcluirComunicado(e, item.id)}
@@ -772,10 +776,10 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
             )}
           </div>
 
-          {/* --- LIVROS NO FUNDO À DIREITA (PILHA EM LINHAS PRETO E BRANCO PADRÃO) --- */}
+          {/* PILHA DE LIVROS DE FUNDO À DIREITA (P&B) */}
           <div style={{
             position: 'absolute',
-            right: '20px',
+            right: '10px',
             top: '50%',
             transform: 'translateY(-50%)',
             pointerEvents: 'none',
@@ -786,7 +790,7 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
               src="/stack-of-books.png"
               alt="Pilha de Livros"
               style={{
-                width: '155px',
+                width: '160px',
                 opacity: 0.35,
                 filter: 'grayscale(100%) contrast(180%)'
               }}
