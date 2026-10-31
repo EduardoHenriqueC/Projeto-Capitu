@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
 
 export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
@@ -112,9 +113,10 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
     };
   }, []);
 
+  // FOCO COM PREVENTSCROLL PARA NÃO DESLOCAR A POSIÇÃO DA PÁGINA
   useEffect(() => {
     if (modalNota && modalContainerRef.current) {
-      modalContainerRef.current.focus();
+      modalContainerRef.current.focus({ preventScroll: true });
     }
   }, [modalNota]);
 
@@ -419,7 +421,6 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
                           {c.c}
                         </span>
 
-                        {/* BOTÕES DE SUPERVISOR NOS CARDS */}
                         {isSupervisor && (
                           <div style={{ display: 'flex', gap: '6px' }} onClick={(e) => e.stopPropagation()}>
                             <button
@@ -440,7 +441,6 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
                               ✏️
                             </button>
 
-                            {/* BOTÃO '✕' MAIS AMIGÁVEL E DISCRETO */}
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -494,18 +494,22 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
         </main>
       </div>
 
-      {/* MODAL EXPANDIDO DE LEITURA (COM EDITAR E EXCLUIR EMBUTIDOS) */}
-      {modalNota && (
+      {/* ========================================================
+          MODAIS RENDERIZADOS VIA PORTAL DIRETAMENTE NO BODY
+      ======================================================== */}
+
+      {/* 1. MODAL EXPANDIDO DE LEITURA (CTRL+A INTELIGENTE) */}
+      {isMounted && modalNota && createPortal(
         <div
           style={{
             position: 'fixed',
-            top: 0, left: 0, right: 0, bottom: 0,
+            inset: 0,
             backgroundColor: 'rgba(0, 30, 30, 0.55)',
             backdropFilter: 'blur(3px)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            zIndex: 1200,
+            zIndex: 9999,
             padding: '20px'
           }}
           onClick={() => setModalNota(null)}
@@ -586,7 +590,6 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
               {compilarTexto(modalNota.txt, modalNota.c)}
             </div>
 
-            {/* BARRA DE AÇÕES INFERIOR DO MODAL EXPANDIDO */}
             <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
               <div>
                 {isSupervisor && (
@@ -672,12 +675,13 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {/* MODAL CRIAR / EDITAR */}
-      {modalAberto && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 30, 30, 0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1300, padding: '20px' }}>
+      {/* 2. MODAL CRIAR / EDITAR */}
+      {isMounted && modalAberto && createPortal(
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0, 30, 30, 0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
           <div style={{ background: '#FFFFFF', borderRadius: '16px', width: '100%', maxWidth: '560px', padding: '28px', boxShadow: 'var(--shadow-lg)' }}>
             <h3 style={{ margin: '0 0 16px 0', color: 'var(--ev-teal-dark)' }}>{formData.id ? '✏️ Editar Colinha' : '➕ Nova Colinha Operacional'}</h3>
             <form onSubmit={salvarColinha}>
@@ -712,20 +716,21 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {/* MODAL DE CONFIRMAÇÃO DE EXCLUSÃO CLEAN */}
-      {colinhaParaExcluir && (
+      {/* 3. MODAL DE CONFIRMAÇÃO DE EXCLUSÃO (CENTRALIZADO PERFEITAMENTE NA TELA) */}
+      {isMounted && colinhaParaExcluir && createPortal(
         <div style={{
           position: 'fixed',
-          top: 0, left: 0, right: 0, bottom: 0,
+          inset: 0,
           backgroundColor: 'rgba(0, 20, 20, 0.7)',
           backdropFilter: 'blur(3px)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 1500,
+          zIndex: 9999,
           padding: '20px'
         }}>
           <div style={{
@@ -797,11 +802,12 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {/* FEEDBACK TOAST ESTILIZADO */}
-      {toast.visivel && (
+      {/* 4. FEEDBACK TOAST VIA PORTAL */}
+      {isMounted && toast.visivel && createPortal(
         <div style={{
           position: 'fixed',
           bottom: '28px',
@@ -811,7 +817,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
           padding: '13px 24px',
           borderRadius: '9999px',
           border: `1.5px solid ${toast.tipo === 'erro' ? '#FCA5A5' : 'var(--ev-turquoise)'}`,
-          zIndex: 2000,
+          zIndex: 9999,
           fontWeight: '700',
           fontSize: '0.92rem',
           boxShadow: '0 8px 24px rgba(0, 0, 0, 0.2)',
@@ -820,7 +826,8 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
           gap: '8px'
         }}>
           {toast.mensagem}
-        </div>
+        </div>,
+        document.body
       )}
 
     </div>
