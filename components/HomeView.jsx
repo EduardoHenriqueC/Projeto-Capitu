@@ -501,30 +501,60 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
             )}
           </div>
 
-          {/* ILUSTRAÇÃO LATERAL DIREITA (SVG) */}
-          <div className="mural-book-decor" style={{ position: 'absolute', right: '0px', top: '50%', transform: 'translateY(-50%)', width: '135px', pointerEvents: 'none', zIndex: 1 }}>
-            <svg width="135" height="260" viewBox="0 0 135 260" fill="none" stroke="#8A7B68" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <g transform="translate(15, 40)">
-                <path d="M 10 30 L 95 10 L 105 20 L 20 40 Z" fill="#F8F6F0" />
-                <path d="M 10 30 L 20 40 L 20 54 L 10 44 Z" fill="#F4EFE6" />
-                <path d="M 20 40 L 105 20 L 105 34 L 20 54 Z" fill="#FFFFFF" />
-
-                <g transform="translate(4, 28) rotate(-4)">
-                  <path d="M 10 30 L 95 10 L 105 20 L 20 40 Z" fill="#F8F6F0" />
-                  <path d="M 10 30 L 20 40 L 20 56 L 10 46 Z" fill="#F4EFE6" />
-                  <path d="M 20 40 L 105 20 L 105 36 L 20 56 Z" fill="#FFFFFF" />
+          {/* ILUSTRAÇÃO LATERAL DIREITA: TORRE DE LIVROS EMPILHADOS */}
+          <div className="mural-book-decor" style={{ position: 'absolute', right: '-15px', top: '50%', transform: 'translateY(-50%)', width: '150px', pointerEvents: 'none', zIndex: 1 }}>
+            <svg width="150" height="260" viewBox="0 0 150 260" fill="none" stroke="#8A7B68" strokeWidth="2.2" strokeLinejoin="round" strokeLinecap="round">
+              <g transform="translate(10, 30)">
+                <g transform="translate(0, 170)">
+                  <path d="M 60 40 L 125 24 L 125 4 L 60 20 Z" fill="#F4EFE6" />
+                  <line x1="60" y1="25" x2="125" y2="9" strokeWidth="1.2" />
+                  <line x1="60" y1="30" x2="125" y2="14" strokeWidth="1.2" />
+                  <line x1="60" y1="35" x2="125" y2="19" strokeWidth="1.2" />
+                  <path d="M 0 22 L 60 40 L 60 20 L 0 2 Z" fill="#E2DAC9" />
+                  <path d="M 0 2 L 60 20 L 125 4 L 65 -14 Z" fill="#EAE4D5" />
                 </g>
-
-                <g transform="translate(-2, 58) rotate(5)">
-                  <path d="M 10 30 L 95 10 L 105 20 L 20 40 Z" fill="#F8F6F0" />
-                  <path d="M 10 30 L 20 40 L 20 56 L 10 46 Z" fill="#F4EFE6" />
-                  <path d="M 20 40 L 105 20 L 105 36 L 20 56 Z" fill="#FFFFFF" />
+                <g transform="translate(15, 140)">
+                  <path d="M 50 38 L -5 22 L -5 6 L 50 22 Z" fill="#F4EFE6" /> 
+                  <line x1="50" y1="26" x2="-5" y2="10" strokeWidth="1.2" />
+                  <line x1="50" y1="30" x2="-5" y2="14" strokeWidth="1.2" />
+                  <line x1="50" y1="34" x2="-5" y2="18" strokeWidth="1.2" />
+                  <path d="M 120 18 L 50 38 L 50 22 L 120 2 Z" fill="#EAE4D5" />
+                  <path d="M 120 2 L 50 22 L -5 6 L 65 -14 Z" fill="#FAF7F0" />
                 </g>
-
-                <g transform="translate(2, 90)">
-                  <path d="M 10 30 L 95 10 L 105 20 L 20 40 Z" fill="#F8F6F0" />
-                  <path d="M 10 30 L 20 40 L 20 60 L 10 50 Z" fill="#F4EFE6" />
-                  <path d="M 20 40 L 105 20 L 105 40 L 20 60 Z" fill="#FFFFFF" />
+                <g transform="translate(5, 110)">
+                  <path d="M 65 38 L 125 22 L 125 6 L 65 22 Z" fill="#F4EFE6" />
+                  <line x1="65" y1="26" x2="125" y2="10" strokeWidth="1.2" />
+                  <line x1="65" y1="30" x2="125" y2="14" strokeWidth="1.2" />
+                  <line x1="65" y1="34" x2="125" y2="18" strokeWidth="1.2" />
+                  <path d="M 5 22 L 65 38 L 65 22 L 5 6 Z" fill="#E2DAC9" />
+                  <path d="M 5 6 L 65 22 L 125 6 L 65 -10 Z" fill="#EAE4D5" />
+                </g>
+                <g transform="translate(25, 80)">
+                  <path d="M 50 35 L -10 20 L -10 4 L 50 19 Z" fill="#F4EFE6" />
+                  <line x1="50" y1="23" x2="-10" y2="8" strokeWidth="1.2" />
+                  <line x1="50" y1="27" x2="-10" y2="12" strokeWidth="1.2" />
+                  <line x1="50" y1="31" x2="-10" y2="16" strokeWidth="1.2" />
+                  <path d="M 110 15 L 50 35 L 50 19 L 110 -1 Z" fill="#EAE4D5" />
+                  <path d="M 110 -1 L 50 19 L -10 4 L 50 -16 Z" fill="#FAF7F0" />
+                </g>
+                <g transform="translate(10, 50)">
+                  <path d="M 70 38 L 125 22 L 125 6 L 70 22 Z" fill="#F4EFE6" />
+                  <line x1="70" y1="26" x2="125" y2="10" strokeWidth="1.2" />
+                  <line x1="70" y1="30" x2="125" y2="14" strokeWidth="1.2" />
+                  <line x1="70" y1="34" x2="125" y2="18" strokeWidth="1.2" />
+                  <path d="M 5 20 L 70 38 L 70 22 L 5 4 Z" fill="#E2DAC9" />
+                  <line x1="18" y1="24" x2="18" y2="8" strokeWidth="2" />
+                  <line x1="28" y1="27" x2="28" y2="11" strokeWidth="2" />
+                  <line x1="38" y1="30" x2="38" y2="14" strokeWidth="2" />
+                  <line x1="48" y1="33" x2="48" y2="16" strokeWidth="2" />
+                  <path d="M 5 4 L 70 22 L 125 6 L 60 -12 Z" fill="#EAE4D5" />
+                </g>
+                <g transform="translate(35, 20)">
+                  <path d="M 45 35 L -10 20 L -10 6 L 45 21 Z" fill="#F4EFE6" />
+                  <line x1="45" y1="25" x2="-10" y2="10" strokeWidth="1.2" />
+                  <line x1="45" y1="30" x2="-10" y2="15" strokeWidth="1.2" />
+                  <path d="M 95 20 L 45 35 L 45 21 L 95 6 Z" fill="#EAE4D5" />
+                  <path d="M 95 6 L 45 21 L -10 6 L 40 -9 Z" fill="#FAF7F0" />
                 </g>
               </g>
             </svg>

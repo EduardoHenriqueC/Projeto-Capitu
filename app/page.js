@@ -226,15 +226,28 @@ export default function Page() {
         top: 0,
         zIndex: 100
       }}>
-        {/* LOGO */}
-        <div 
-          onClick={() => setView('inicio')}
-          style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}
-        >
-          <div style={{ fontWeight: '900', fontSize: '1.28rem', color: 'var(--ev-teal-dark)' }}>
-            📚 Portal Capitu
-          </div>
-        </div>
+      {/* LOGO SIMPLES ORIGINAL */}
+      <div
+      onClick={() => setView('inicio')}
+      style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: '10px',
+      cursor: 'pointer',
+      userSelect: 'none'
+      }}
+>
+      <span style={{ fontSize: '1.45rem' }}>📚</span>
+      <span style={{
+      fontSize: '1.25rem',
+      fontWeight: '900',
+      color: '#004D4C',
+      whiteSpace: 'nowrap',
+      letterSpacing: '-0.3px'
+      }}>
+      Portal Capitu
+      </span>
+      </div>
 
         {/* NAVEGAÇÃO ENTRE AS PÁGINAS */}
         <nav style={{ display: 'flex', gap: '8px' }}>
