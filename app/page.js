@@ -226,28 +226,47 @@ export default function Page() {
         top: 0,
         zIndex: 100
       }}>
-      {/* LOGO SIMPLES ORIGINAL */}
-      <div
-      onClick={() => setView('inicio')}
-      style={{
-      display: 'flex',
-      alignItems: 'center',
-      gap: '10px',
-      cursor: 'pointer',
-      userSelect: 'none'
-      }}
+ {/* LOGO COM EMBLEMA E IDENTIDADE ESTANTE VIRTUAL */}
+<div
+  onClick={() => setView('inicio')}
+  style={{
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    cursor: 'pointer',
+    userSelect: 'none'
+  }}
 >
-      <span style={{ fontSize: '1.45rem' }}>📚</span>
-      <span style={{
-      fontSize: '1.25rem',
-      fontWeight: '900',
+  <div style={{
+    backgroundColor: '#004D4C',
+    width: '42px',
+    height: '42px',
+    borderRadius: '12px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '1.3rem',
+    flexShrink: 0
+  }}>
+    📚
+  </div>
+
+  <div style={{ display: 'flex', flexDirection: 'column' }}>
+    <span style={{
+      fontSize: '0.64rem',
+      fontWeight: '800',
       color: '#004D4C',
-      whiteSpace: 'nowrap',
-      letterSpacing: '-0.3px'
-      }}>
-      Portal Capitu
-      </span>
-      </div>
+      letterSpacing: '0.8px',
+      textTransform: 'uppercase'
+    }}>
+      ESTANTE VIRTUAL
+    </span>
+    <div style={{ fontSize: '1.25rem', fontWeight: '900', lineHeight: 1.1 }}>
+      <span style={{ color: '#004D4C' }}>Portal </span>
+      <span style={{ color: '#2DD4BF' }}>Capitu</span>
+    </div>
+  </div>
+</div>
 
         {/* NAVEGAÇÃO ENTRE AS PÁGINAS */}
         <nav style={{ display: 'flex', gap: '8px' }}>
