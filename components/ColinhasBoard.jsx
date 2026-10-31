@@ -7,10 +7,14 @@ import { supabase } from '../lib/supabase';
 export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
   const [agente, setAgente] = useState('');
   const [isMounted, setIsMounted] = useState(false);
-  const [categoriaAtiva, setCategoriaAtiva] = useState('Todas as Colinhas');
   const [termoBusca, setTermoBusca] = useState('');
   
-  // Toast elegante (sucesso / erro)
+  // Categorias do banco
+  const [categorias, setCategorias] = useState([]);
+  const [filtroAtivo, setFiltroAtivo] = useState({ tipo: 'todas', id: 'todas', nome: 'Todas as Colinhas' });
+  const [expandidas, setExpandidas] = useState({});
+
+  // Toast elegante
   const [toast, setToast] = useState({ visivel: false, mensagem: '', tipo: 'sucesso' });
   
   // Modais
@@ -18,102 +22,108 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
   const [modalNota, setModalNota] = useState(null); 
   const [colinhaParaExcluir, setColinhaParaExcluir] = useState(null);
   const [excluindo, setExcluindo] = useState(false);
+  const [modalCategoria, setModalCategoria] = useState(false);
 
-  // Referências para o Ctrl+A inteligente
-  const modalContainerRef = useRef(null);
-  const modalTextRef = useRef(null);
-
+  // Form Colinha
   const [formData, setFormData] = useState({
     id: null,
     t: '',
-    c: '🚫 Cancelamento',
+    c: '',
+    sub: '',
     atalho: '',
     txt: ''
   });
 
-  const categoriasBase = [
-    { id: 'Todas as Colinhas', nome: 'Todas as Colinhas', icone: '📑' },
-    { id: '🗣️ Relacionamento', nome: 'Relacionamento & Finalização', icone: '🗣️' },
-    { id: '📦 Rastreio', nome: 'Entrega & Rastreamento', icone: '📦' },
-    { id: '⏳ Atrasos', nome: 'Atrasos & Extravios', icone: '⏳' },
-    { id: '🏪 Vendedor', nome: 'Acionamento Vendedor & Standby', icone: '🏪' },
-    { id: '🔄 Trocas', nome: 'Trocas, Devoluções & Avarias', icone: '🔄' },
-    { id: '🚫 Cancelamento', nome: 'Cancelamento & Reembolso', icone: '🚫' },
-    { id: '💳 Financeiro', nome: 'Financeiro, Pagamentos & NF', icone: '💳' },
-    { id: '🔐 Cadastro', nome: 'Cadastro, Login & Segurança', icone: '🔐' },
-    { id: '🛒 Plataforma', nome: 'Plataforma, Carrinho & Dúvidas', icone: '🛒' },
-    { id: '📋 Máscaras Internas', nome: 'Máscaras & Registros', icone: '📋' }
-  ];
+  // Form Categoria / Subcategoria
+  const [formCat, setFormCat] = useState({
+    tipo: 'principal', // 'principal' | 'subcategoria'
+    nome: '',
+    icone: '📁',
+    parentId: ''
+  });
 
-  const getCor = (cat) => {
-    switch (cat) {
-      case '🗣️ Relacionamento': return { bg: '#F5EEF8', border: '#D7BDE2' };
-      case '📋 Máscaras Internas': return { bg: '#F2F4F4', border: '#D5D8DC' };
-      case '📦 Rastreio': return { bg: '#E8F8F5', border: '#A3E4D7' };
-      case '⏳ Atrasos': return { bg: '#FEF9E7', border: '#F9E79F' };
-      case '🏪 Vendedor': return { bg: '#FDF2E9', border: '#F5CBA7' };
-      case '🔄 Trocas': return { bg: '#F9EBEA', border: '#F2D7D5' };
-      case '🚫 Cancelamento': return { bg: '#FDEDEC', border: '#F5B7B1' };
-      case '💳 Financeiro': return { bg: '#EAF2F8', border: '#A9CCE3' };
-      case '🔐 Cadastro': return { bg: '#EAFAF1', border: '#A9DFBF' };
-      case '🛒 Plataforma': return { bg: '#F4ECF7', border: '#D2B4DE' };
-      default: return { bg: '#FFFFFF', border: '#CBD5E1' };
-    }
-  };
-
+  const modalContainerRef = useRef(null);
+  const modalTextRef = useRef(null);
   const [colinhas, setColinhas] = useState([]);
 
   const dispararToast = (mensagem, tipo = 'sucesso') => {
     setToast({ visivel: true, mensagem, tipo });
-    setTimeout(() => {
-      setToast({ visivel: false, mensagem: '', tipo: 'sucesso' });
-    }, 2800);
+    setTimeout(() => setToast({ visivel: false, mensagem: '', tipo: 'sucesso' }), 2800);
   };
 
-  // 1. BUSCA AS COLINHAS NO BANCO DO SUPABASE
+  // Cores dinâmicas
+  const getCor = (catNome) => {
+    if (!catNome) return { bg: '#FFFFFF', border: '#CBD5E1' };
+    if (catNome.includes('Relacionamento')) return { bg: '#F5EEF8', border: '#D7BDE2' };
+    if (catNome.includes('Máscaras')) return { bg: '#F2F4F4', border: '#D5D8DC' };
+    if (catNome.includes('Entrega') || catNome.includes('Rastreio')) return { bg: '#E8F8F5', border: '#A3E4D7' };
+    if (catNome.includes('Atrasos')) return { bg: '#FEF9E7', border: '#F9E79F' };
+    if (catNome.includes('Vendedor')) return { bg: '#FDF2E9', border: '#F5CBA7' };
+    if (catNome.includes('Trocas')) return { bg: '#F9EBEA', border: '#F2D7D5' };
+    if (catNome.includes('Cancelamento')) return { bg: '#FDEDEC', border: '#F5B7B1' };
+    if (catNome.includes('Financeiro')) return { bg: '#EAF2F8', border: '#A9CCE3' };
+    if (catNome.includes('Cadastro')) return { bg: '#EAFAF1', border: '#A9DFBF' };
+    if (catNome.includes('Plataforma')) return { bg: '#F4ECF7', border: '#D2B4DE' };
+    return { bg: '#FFFFFF', border: '#CBD5E1' };
+  };
+
+  // 1. BUSCA CATEGORIAS NO BANCO
+  const buscarCategorias = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('categorias_colinhas')
+        .select('*')
+        .order('id', { ascending: true });
+
+      if (error) throw error;
+      if (data) setCategorias(data);
+    } catch (err) {
+      console.error('Erro ao buscar categorias:', err);
+    }
+  };
+
+  // 2. BUSCA COLINHAS NO BANCO
   const buscarColinhas = async () => {
     try {
       const { data, error } = await supabase
         .from('colinhas')
         .select('*')
-        .order('categoria', { ascending: true })
         .order('titulo', { ascending: true });
 
       if (error) throw error;
-
       if (data) {
         setColinhas(
           data.map((item) => ({
             id: item.id,
             t: item.titulo,
             c: item.categoria,
+            sub: item.subcategoria || '',
             txt: item.conteudo,
             atalho: item.atalho || ''
           }))
         );
       }
     } catch (err) {
-      console.error('Erro ao buscar colinhas no Supabase:', err);
+      console.error('Erro ao buscar colinhas:', err);
     }
   };
 
-  // 2. DISPARA BUSCA AO INICIAR E ATIVA REALTIME
   useEffect(() => {
+    buscarCategorias();
     buscarColinhas();
+    setIsMounted(true);
 
-    const canal = supabase
-      .channel('colinhas_realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'colinhas' }, () => {
-        buscarColinhas();
-      })
+    const canalColinhas = supabase
+      .channel('colinhas_realtime_full')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'colinhas' }, () => buscarColinhas())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'categorias_colinhas' }, () => buscarCategorias())
       .subscribe();
 
     return () => {
-      supabase.removeChannel(canal);
+      supabase.removeChannel(canalColinhas);
     };
   }, []);
 
-  // FOCO COM PREVENTSCROLL PARA NÃO DESLOCAR A POSIÇÃO DA PÁGINA
   useEffect(() => {
     if (modalNota && modalContainerRef.current) {
       modalContainerRef.current.focus({ preventScroll: true });
@@ -123,7 +133,6 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
   useEffect(() => {
     const salvo = localStorage.getItem('capitu_agente_nome');
     if (salvo) setAgente(salvo);
-    setIsMounted(true);
   }, []);
 
   const handleAgenteChange = (e) => {
@@ -138,7 +147,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
 
     if (nome) {
       final = final.replace(/{agente}/gi, nome);
-      if (categoria !== '📋 Máscaras Internas' && !final.includes('Atenciosamente') && !final.includes('Liderança:')) {
+      if (categoria !== 'Máscaras & Registros' && !final.includes('Atenciosamente') && !final.includes('Liderança:')) {
         final += `\n\nAtenciosamente,\n${nome}\nEquipe Estante Virtual 💚`;
       }
     } else {
@@ -147,16 +156,16 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
       final = final.replace(/\n{agente}\nEquipe Estante Virtual/gi, '\nEquipe Estante Virtual');
       final = final.replace(/{agente}/gi, 'Equipe Estante Virtual');
 
-      if (categoria !== '📋 Máscaras Internas' && !final.includes('Atenciosamente') && !final.includes('Liderança:')) {
+      if (categoria !== 'Máscaras & Registros' && !final.includes('Atenciosamente') && !final.includes('Liderança:')) {
         final += `\n\nAtenciosamente,\nEquipe Estante Virtual 💚`;
       }
     }
-
     return final;
   };
 
   const abrirModalCriar = () => {
-    setFormData({ id: null, t: '', c: '🗣️ Relacionamento', atalho: '', txt: '' });
+    const catPadrao = categorias.find((c) => !c.parent_id)?.nome || '';
+    setFormData({ id: null, t: '', c: catPadrao, sub: '', atalho: '', txt: '' });
     setModalAberto(true);
   };
 
@@ -166,28 +175,30 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
       id: item.id,
       t: item.t,
       c: item.c,
+      sub: item.sub || '',
       atalho: item.atalho || '',
       txt: item.txt
     });
     setModalAberto(true);
   };
 
-  // 3. SALVAR (CRIAÇÃO OU ATUALIZAÇÃO)
+  // 3. SALVAR / EDITAR / MOVER COLINHA
   const salvarColinha = async (e) => {
     e.preventDefault();
-
-    if (!formData.t.trim() || !formData.txt.trim()) {
-      dispararToast('Por favor, preencha o título e o texto da colinha.', 'erro');
+    if (!formData.t.trim() || !formData.txt.trim() || !formData.c) {
+      dispararToast('Preencha título, categoria e conteúdo.', 'erro');
       return;
     }
 
     try {
       if (formData.id) {
+        // Atualiza e move a colinha se a categoria/subcategoria tiver sido alterada
         const { error } = await supabase
           .from('colinhas')
           .update({
             titulo: formData.t,
             categoria: formData.c,
+            subcategoria: formData.sub || null,
             conteudo: formData.txt,
             atalho: formData.atalho || '',
             atualizado_em: new Date().toISOString()
@@ -195,18 +206,16 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
           .eq('id', formData.id);
 
         if (error) throw error;
-        dispararToast('✅ Colinha atualizada com sucesso no banco!', 'sucesso');
+        dispararToast('✅ Colinha e categoria atualizadas com sucesso!', 'sucesso');
       } else {
-        const autor = (typeof usuarioLogado !== 'undefined' && usuarioLogado?.nome)
-          ? usuarioLogado.nome
-          : 'Supervisão EV';
-
+        const autor = usuarioLogado?.nome || 'Supervisão EV';
         const { error } = await supabase
           .from('colinhas')
           .insert([
             {
               titulo: formData.t,
               categoria: formData.c,
+              subcategoria: formData.sub || null,
               conteudo: formData.txt,
               atalho: formData.atalho || '',
               autor_nome: autor
@@ -214,62 +223,126 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
           ]);
 
         if (error) throw error;
-        dispararToast('✨ Nova colinha cadastrada com sucesso!', 'sucesso');
+        dispararToast('✨ Nova colinha salva no banco!', 'sucesso');
       }
 
       setModalAberto(false);
-      setFormData({ id: null, t: '', c: '🗣️ Relacionamento', atalho: '', txt: '' });
       await buscarColinhas();
     } catch (err) {
-      console.error('Erro ao salvar no Supabase:', err);
-      dispararToast('Falha ao salvar no banco: ' + err.message, 'erro');
+      console.error('Erro ao salvar colinha:', err);
+      dispararToast('Erro ao salvar: ' + err.message, 'erro');
     }
   };
 
-  // 4. EXCLUIR DEFINITIVAMENTE DO SUPABASE
+  // 4. EXCLUIR COLINHA
   const confirmarExclusao = async () => {
     if (!colinhaParaExcluir) return;
-
     setExcluindo(true);
     try {
-      const { error } = await supabase
-        .from('colinhas')
-        .delete()
-        .eq('id', colinhaParaExcluir.id);
-
+      const { error } = await supabase.from('colinhas').delete().eq('id', colinhaParaExcluir.id);
       if (error) throw error;
 
       dispararToast(`Colinha "${colinhaParaExcluir.t}" removida!`, 'sucesso');
       setColinhaParaExcluir(null);
       await buscarColinhas();
     } catch (err) {
-      console.error('Erro ao excluir no Supabase:', err);
+      console.error('Erro ao excluir:', err);
       dispararToast('Erro ao excluir colinha: ' + err.message, 'erro');
     } finally {
       setExcluindo(false);
     }
   };
 
+  // 5. CRIAR CATEGORIA / SUBCATEGORIA
+  const salvarCategoria = async (e) => {
+    e.preventDefault();
+    if (!formCat.nome.trim()) {
+      dispararToast('Informe o nome da categoria.', 'erro');
+      return;
+    }
+
+    if (formCat.tipo === 'subcategoria' && !formCat.parentId) {
+      dispararToast('Selecione a categoria pai.', 'erro');
+      return;
+    }
+
+    try {
+      const nova = {
+        nome: formCat.nome.trim(),
+        icone: formCat.icone.trim() || '📁',
+        parent_id: formCat.tipo === 'subcategoria' ? Number(formCat.parentId) : null
+      };
+
+      const { error } = await supabase.from('categorias_colinhas').insert([nova]);
+      if (error) throw error;
+
+      dispararToast(
+        formCat.tipo === 'subcategoria'
+          ? '📂 Subcategoria criada com sucesso!'
+          : '📁 Categoria criada com sucesso!',
+        'sucesso'
+      );
+      setModalCategoria(false);
+      setFormCat({ tipo: 'principal', nome: '', icone: '📁', parentId: '' });
+      await buscarCategorias();
+    } catch (err) {
+      console.error('Erro ao criar categoria:', err);
+      dispararToast('Erro ao salvar categoria: ' + err.message, 'erro');
+    }
+  };
+
+  // 6. EXCLUIR CATEGORIA DO BANCO
+  const excluirCategoria = async (e, id, nome) => {
+    e.stopPropagation();
+    if (!window.confirm(`Tem certeza de que deseja excluir "${nome}"? Subcategorias e vínculos serão afetados.`)) return;
+
+    try {
+      const { error } = await supabase.from('categorias_colinhas').delete().eq('id', id);
+      if (error) throw error;
+
+      dispararToast(`Categoria "${nome}" removida!`, 'sucesso');
+      if (filtroAtivo.id === id) {
+        setFiltroAtivo({ tipo: 'todas', id: 'todas', nome: 'Todas as Colinhas' });
+      }
+      await buscarCategorias();
+    } catch (err) {
+      console.error('Erro ao excluir categoria:', err);
+      dispararToast('Erro ao excluir: ' + err.message, 'erro');
+    }
+  };
+
+  // Organização em Árvore
+  const categoriasPrincipais = categorias.filter((c) => !c.parent_id);
+  const getSubcategorias = (parentId) => categorias.filter((c) => c.parent_id === parentId);
+
+  // Filtragem
   const colinhasFiltradas = colinhas.filter((c) => {
-    const bateCategoria = categoriaAtiva === 'Todas as Colinhas' || c.c === categoriaAtiva;
+    let bateCategoria = true;
+    if (filtroAtivo.tipo === 'principal') {
+      bateCategoria = c.c === filtroAtivo.nome;
+    } else if (filtroAtivo.tipo === 'subcategoria') {
+      bateCategoria = c.sub === filtroAtivo.nome;
+    }
+
     const termo = termoBusca.toLowerCase().trim();
     const bateBusca =
       termo === '' ||
       c.t.toLowerCase().includes(termo) ||
       c.txt.toLowerCase().includes(termo) ||
       (c.atalho && c.atalho.toLowerCase().includes(termo));
+
     return bateCategoria && bateBusca;
   });
 
   return (
-    <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '36px 20px 80px 20px' }}>
+    <div style={{ maxWidth: '1440px', margin: '0 auto', padding: '36px 20px 80px 20px' }}>
       
       {/* BARRA SUPERIOR DE PESQUISA E ASSINATURA */}
       <div style={{
         background: '#FFFFFF',
         borderRadius: '16px',
         padding: '16px 24px',
-        border: '1px solid var(--border-subtle)',
+        border: '1px solid var(--border-subtle, #E2E8F0)',
         boxShadow: '0 2px 8px rgba(0, 77, 76, 0.05)',
         marginBottom: '32px',
         display: 'flex',
@@ -279,10 +352,10 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
         gap: '16px'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: 1, minWidth: '300px' }}>
-          <span style={{ fontSize: '1.25rem', color: 'var(--ev-teal-primary)' }}>🔍</span>
+          <span style={{ fontSize: '1.25rem', color: 'var(--ev-teal-primary, #006968)' }}>🔍</span>
           <input
             type="text"
-            placeholder="Pesquise por qualquer termo, atalho (/pix), regra de frete, cancelamento..."
+            placeholder="Pesquise por qualquer termo, atalho (/pix), regra de frete..."
             value={termoBusca}
             onChange={(e) => setTermoBusca(e.target.value)}
             style={{
@@ -291,26 +364,26 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
               fontSize: '0.98rem',
               width: '100%',
               fontWeight: '500',
-              color: 'var(--text-dark)'
+              color: '#1E293B'
             }}
           />
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', borderLeft: '1px solid var(--border-subtle)', paddingLeft: '16px' }}>
-          <label style={{ fontSize: '0.88rem', fontWeight: '700', color: 'var(--ev-teal-dark)' }}>✍️ Assinatura:</label>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', borderLeft: '1px solid #E2E8F0', paddingLeft: '16px' }}>
+          <label style={{ fontSize: '0.88rem', fontWeight: '700', color: 'var(--ev-teal-dark, #004D4C)' }}>✍️ Assinatura:</label>
           <input
             type="text"
             placeholder="Ex: Mariana"
             value={agente}
             onChange={handleAgenteChange}
-            style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '0.9rem', width: '160px' }}
+            style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '0.9rem', width: '150px' }}
           />  
 
           {isSupervisor && (
             <button
               onClick={abrirModalCriar}
               style={{
-                background: 'var(--ev-teal-primary)',
+                background: 'var(--ev-teal-primary, #006968)',
                 color: '#FFF',
                 border: 'none',
                 padding: '9px 18px',
@@ -323,69 +396,216 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
                 boxShadow: '0 2px 6px rgba(0, 105, 104, 0.25)'
               }}
             >
-              ➕ Nova
+              ➕ Nova Colinha
             </button>
           )}
         </div>
       </div>
 
-      {/* LAYOUT: MENU LATERAL + CONTEÚDO */}
-      <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: '28px', alignItems: 'start' }}>
+      {/* LAYOUT: MENU LATERAL + LISTAGEM */}
+      <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: '28px', alignItems: 'start' }}>
         
-        {/* MENU LATERAL */}
+        {/* MENU LATERAL COM GERENCIAMENTO DE CATEGORIAS */}
         <aside style={{ 
           display: 'flex', 
           flexDirection: 'column', 
-          gap: '8px', 
+          gap: '6px', 
           position: 'sticky', 
-          top: '100px',
-          maxHeight: 'calc(100vh - 120px)',
+          top: '90px',
+          maxHeight: 'calc(100vh - 110px)',
           overflowY: 'auto',
           paddingRight: '6px'
         }}>
-          {categoriasBase.map((cat) => {
-            const isAtiva = categoriaAtiva === cat.id;
+          
+          {/* BOTÃO TODAS AS COLINHAS */}
+          <button
+            onClick={() => setFiltroAtivo({ tipo: 'todas', id: 'todas', nome: 'Todas as Colinhas' })}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              padding: '12px 14px',
+              borderRadius: '12px',
+              border: filtroAtivo.id === 'todas' ? '2px solid var(--ev-teal-primary, #006968)' : '1px solid transparent',
+              background: filtroAtivo.id === 'todas' ? 'rgba(0, 105, 104, 0.08)' : 'transparent',
+              color: filtroAtivo.id === 'todas' ? 'var(--ev-teal-primary, #006968)' : '#64748B',
+              cursor: 'pointer',
+              textAlign: 'left',
+              fontWeight: filtroAtivo.id === 'todas' ? '800' : '600',
+              fontSize: '0.92rem'
+            }}
+          >
+            <div style={{ fontSize: '1.2rem', width: '26px', textAlign: 'center' }}>📑</div>
+            <div>Todas as Colinhas</div>
+          </button>
+
+          {/* LISTA DINÂMICA DE CATEGORIAS E SUBCATEGORIAS */}
+          {categoriasPrincipais.map((cat) => {
+            const isAtiva = filtroAtivo.tipo === 'principal' && filtroAtivo.id === cat.id;
+            const subs = getSubcategorias(cat.id);
+            const isExpandida = expandidas[cat.id];
+
             return (
-              <button
-                key={cat.id}
-                onClick={() => setCategoriaAtiva(cat.id)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                  padding: '12px 14px',
-                  borderRadius: '12px',
-                  border: isAtiva ? '2px solid var(--ev-teal-primary)' : '1px solid transparent',
-                  background: isAtiva ? 'rgba(0, 105, 104, 0.05)' : 'transparent',
-                  color: isAtiva ? 'var(--ev-teal-primary)' : 'var(--text-muted)',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                  transition: 'all 0.2s ease',
-                  fontWeight: isAtiva ? '800' : '600',
-                  fontSize: '0.9rem'
-                }}
-              >
-                <div style={{ fontSize: '1.2rem', width: '28px', textAlign: 'center' }}>{cat.icone}</div>
-                <div>{cat.nome}</div>
-              </button>
+              <div key={cat.id} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <div
+                  onClick={() => setFiltroAtivo({ tipo: 'principal', id: cat.id, nome: cat.nome })}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '10px 12px',
+                    borderRadius: '10px',
+                    border: isAtiva ? '2px solid var(--ev-teal-primary, #006968)' : '1px solid transparent',
+                    background: isAtiva ? 'rgba(0, 105, 104, 0.08)' : 'transparent',
+                    color: isAtiva ? 'var(--ev-teal-primary, #006968)' : '#334155',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', overflow: 'hidden' }}>
+                    <span style={{ fontSize: '1.15rem' }}>{cat.icone || '📁'}</span>
+                    <span style={{ fontSize: '0.88rem', fontWeight: isAtiva ? '800' : '600', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                      {cat.nome}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    {subs.length > 0 && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setExpandidas({ ...expandidas, [cat.id]: !isExpandida });
+                        }}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          color: '#64748B',
+                          fontSize: '0.72rem',
+                          padding: '2px 4px'
+                        }}
+                        title="Ver subcategorias"
+                      >
+                        {isExpandida ? '▼' : '▶'}
+                      </button>
+                    )}
+
+                    {isSupervisor && (
+                      <button
+                        onClick={(e) => excluirCategoria(e, cat.id, cat.nome)}
+                        title="Excluir categoria"
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          color: '#94A3B8',
+                          fontSize: '0.76rem',
+                          padding: '2px 4px'
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.color = '#DC2626')}
+                        onMouseLeave={(e) => (e.currentTarget.style.color = '#94A3B8')}
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* SUBCATEGORIAS ANINHADAS */}
+                {subs.length > 0 && (isExpandida || isAtiva) && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', paddingLeft: '32px', borderLeft: '2px solid #E2E8F0', marginLeft: '16px' }}>
+                    {subs.map((sub) => {
+                      const isSubAtiva = filtroAtivo.tipo === 'subcategoria' && filtroAtivo.id === sub.id;
+                      return (
+                        <div
+                          key={sub.id}
+                          onClick={() => setFiltroAtivo({ tipo: 'subcategoria', id: sub.id, nome: sub.nome })}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '6px 10px',
+                            borderRadius: '8px',
+                            background: isSubAtiva ? '#F0FDFA' : 'transparent',
+                            color: isSubAtiva ? '#0F766E' : '#64748B',
+                            fontWeight: isSubAtiva ? '800' : '600',
+                            fontSize: '0.82rem',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span>{sub.icone || '↳'}</span>
+                            <span>{sub.nome}</span>
+                          </div>
+
+                          {isSupervisor && (
+                            <button
+                              onClick={(e) => excluirCategoria(e, sub.id, sub.nome)}
+                              title="Excluir subcategoria"
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                color: '#94A3B8',
+                                fontSize: '0.72rem'
+                              }}
+                              onMouseEnter={(e) => (e.currentTarget.style.color = '#DC2626')}
+                              onMouseLeave={(e) => (e.currentTarget.style.color = '#94A3B8')}
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             );
           })}
+
+          {/* BOTÃO GERENCIAR CATEGORIAS PARA SUPERVISOR */}
+          {isSupervisor && (
+            <button
+              onClick={() => {
+                setFormCat({ tipo: 'principal', nome: '', icone: '📁', parentId: categoriasPrincipais[0]?.id || '' });
+                setModalCategoria(true);
+              }}
+              style={{
+                marginTop: '12px',
+                padding: '9px 12px',
+                borderRadius: '10px',
+                border: '1.5px dashed var(--ev-teal-primary, #006968)',
+                background: '#F0FDFA',
+                color: 'var(--ev-teal-primary, #006968)',
+                fontWeight: '700',
+                fontSize: '0.84rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px'
+              }}
+            >
+              ➕ Nova Categoria / Sub
+            </button>
+          )}
         </aside>
 
         {/* ÁREA DOS CARDS */}
         <main style={{ minHeight: '600px' }}>
           <div style={{ marginBottom: '20px' }}>
-            <h2 style={{ fontSize: '1.4rem', fontWeight: '800', color: 'var(--ev-teal-dark)', margin: '0 0 6px 0' }}>
-              {categoriaAtiva}
+            <h2 style={{ fontSize: '1.4rem', fontWeight: '800', color: 'var(--ev-teal-dark, #004D4C)', margin: '0 0 6px 0' }}>
+              {filtroAtivo.nome}
             </h2>
-            <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-muted)' }}>
-              {colinhasFiltradas.length} {colinhasFiltradas.length === 1 ? 'colinha disponível' : 'colinhas disponíveis'}. Clique no card para expandir ou copiar o texto.
+            <p style={{ margin: 0, fontSize: '0.9rem', color: '#64748B' }}>
+              {colinhasFiltradas.length} {colinhasFiltradas.length === 1 ? 'colinha disponível' : 'colinhas disponíveis'}.
             </p>
           </div>
 
           <div style={{ opacity: isMounted ? 1 : 0, transition: 'opacity 0.2s ease-in' }}>
             {isMounted && colinhasFiltradas.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-muted)', background: '#FFF', borderRadius: '16px', border: '1px dashed var(--border-subtle)' }}>
+              <div style={{ textAlign: 'center', padding: '60px 20px', color: '#64748B', background: '#FFF', borderRadius: '16px', border: '1px dashed #CBD5E1' }}>
                 <div style={{ fontSize: '2.5rem', marginBottom: '10px' }}>📑</div>
                 <p>Nenhuma colinha encontrada com o termo pesquisado.</p>
               </div>
@@ -417,15 +637,22 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
                       }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                        <span style={{ fontSize: '0.7rem', fontWeight: '800', textTransform: 'uppercase', color: 'rgba(0, 0, 0, 0.5)', letterSpacing: '0.5px' }}>
-                          {c.c}
-                        </span>
+                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: '0.7rem', fontWeight: '800', textTransform: 'uppercase', color: 'rgba(0, 0, 0, 0.55)', letterSpacing: '0.4px' }}>
+                            {c.c}
+                          </span>
+                          {c.sub && (
+                            <span style={{ fontSize: '0.68rem', fontWeight: '800', background: 'rgba(0,0,0,0.06)', padding: '2px 6px', borderRadius: '4px', color: '#334155' }}>
+                              ↳ {c.sub}
+                            </span>
+                          )}
+                        </div>
 
                         {isSupervisor && (
                           <div style={{ display: 'flex', gap: '6px' }} onClick={(e) => e.stopPropagation()}>
                             <button
                               onClick={(e) => abrirModalEditar(e, c)}
-                              title="Editar Colinha"
+                              title="Editar e Mover Colinha"
                               style={{
                                 background: '#FFFFFF',
                                 border: '1px solid #CBD5E1',
@@ -434,8 +661,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
                                 padding: '3px 8px',
                                 fontSize: '0.74rem',
                                 fontWeight: '700',
-                                color: '#334155',
-                                transition: 'all 0.15s'
+                                color: '#334155'
                               }}
                             >
                               ✏️
@@ -455,8 +681,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
                                 padding: '3px 8px',
                                 fontSize: '0.76rem',
                                 fontWeight: '800',
-                                color: '#64748B',
-                                transition: 'all 0.15s'
+                                color: '#64748B'
                               }}
                               onMouseEnter={(e) => {
                                 e.currentTarget.style.background = '#FEE2E2';
@@ -475,14 +700,14 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
                         )}
                       </div>
                       
-                      <h4 style={{ margin: '0 0 12px 0', fontSize: '1rem', color: 'var(--text-dark)', fontWeight: '800' }}>{c.t}</h4>
+                      <h4 style={{ margin: '0 0 12px 0', fontSize: '1rem', color: '#0F172A', fontWeight: '800' }}>{c.t}</h4>
                       
                       <div style={{ fontSize: '0.86rem', color: '#334155', lineHeight: '1.6', whiteSpace: 'pre-wrap', maxHeight: '180px', overflowY: 'hidden', position: 'relative' }}>
                         {compilarTexto(c.txt, c.c)}
                         <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '36px', background: `linear-gradient(transparent, ${cores.bg})` }}></div>
                       </div>
 
-                      <div style={{ marginTop: '14px', paddingTop: '10px', borderTop: '1px dashed rgba(0, 0, 0, 0.1)', textAlign: 'right', fontSize: '0.76rem', fontWeight: '700', color: 'var(--ev-teal-primary)' }}>
+                      <div style={{ marginTop: '14px', paddingTop: '10px', borderTop: '1px dashed rgba(0, 0, 0, 0.1)', textAlign: 'right', fontSize: '0.76rem', fontWeight: '700', color: 'var(--ev-teal-primary, #006968)' }}>
                         Clique para expandir nota 🔍
                       </div>
                     </div>
@@ -495,10 +720,10 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
       </div>
 
       {/* ========================================================
-          MODAIS RENDERIZADOS VIA PORTAL DIRETAMENTE NO BODY
+          MODAIS RENDERIZADOS VIA PORTAL
       ======================================================== */}
 
-      {/* 1. MODAL EXPANDIDO DE LEITURA (CTRL+A INTELIGENTE) */}
+      {/* 1. MODAL DETALHES DE LEITURA */}
       {isMounted && modalNota && createPortal(
         <div
           style={{
@@ -533,7 +758,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
               width: '100%',
               maxWidth: '720px',
               padding: '28px',
-              boxShadow: 'var(--shadow-lg)',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
               maxHeight: '90vh',
               display: 'flex',
               flexDirection: 'column',
@@ -544,10 +769,17 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
               <div>
-                <span style={{ fontSize: '0.75rem', fontWeight: '800', textTransform: 'uppercase', color: 'var(--ev-teal-primary)', letterSpacing: '0.5px' }}>
-                  {modalNota.c}
-                </span>
-                <h3 style={{ margin: '4px 0 0 0', color: 'var(--ev-teal-dark)', fontSize: '1.35rem', fontWeight: '800' }}>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: '800', textTransform: 'uppercase', color: 'var(--ev-teal-primary, #006968)' }}>
+                    {modalNota.c}
+                  </span>
+                  {modalNota.sub && (
+                    <span style={{ fontSize: '0.72rem', fontWeight: '800', background: '#F1F5F9', padding: '2px 8px', borderRadius: '4px', color: '#475569' }}>
+                      ↳ {modalNota.sub}
+                    </span>
+                  )}
+                </div>
+                <h3 style={{ margin: '4px 0 0 0', color: 'var(--ev-teal-dark, #004D4C)', fontSize: '1.35rem', fontWeight: '800' }}>
                   {modalNota.t}
                 </h3>
               </div>
@@ -607,10 +839,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
                       color: '#64748B',
                       fontWeight: '700',
                       cursor: 'pointer',
-                      fontSize: '0.85rem',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '5px'
+                      fontSize: '0.85rem'
                     }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.background = '#FEE2E2';
@@ -644,26 +873,23 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
                       color: '#334155',
                       fontWeight: '700',
                       cursor: 'pointer',
-                      fontSize: '0.86rem',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '6px'
+                      fontSize: '0.86rem'
                     }}
                   >
-                    ✏️ Editar Colinha
+                    ✏️ Editar / Mover
                   </button>
                 )}
 
                 <button
                   onClick={() => {
                     navigator.clipboard.writeText(compilarTexto(modalNota.txt, modalNota.c));
-                    dispararToast(`📋 Texto de "${modalNota.t}" copiado com sucesso!`, 'sucesso');
+                    dispararToast(`📋 Texto de "${modalNota.t}" copiado!`, 'sucesso');
                   }}
                   style={{
                     padding: '8px 22px',
                     borderRadius: '8px',
                     border: 'none',
-                    background: 'var(--ev-teal-primary)',
+                    background: 'var(--ev-teal-primary, #006968)',
                     color: '#FFF',
                     fontWeight: '700',
                     cursor: 'pointer',
@@ -679,40 +905,97 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
         document.body
       )}
 
-      {/* 2. MODAL CRIAR / EDITAR */}
+      {/* 2. MODAL CRIAR / EDITAR / MOVER COLINHA */}
       {isMounted && modalAberto && createPortal(
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0, 30, 30, 0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
-          <div style={{ background: '#FFFFFF', borderRadius: '16px', width: '100%', maxWidth: '560px', padding: '28px', boxShadow: 'var(--shadow-lg)' }}>
-            <h3 style={{ margin: '0 0 16px 0', color: 'var(--ev-teal-dark)' }}>{formData.id ? '✏️ Editar Colinha' : '➕ Nova Colinha Operacional'}</h3>
+          <div style={{ background: '#FFFFFF', borderRadius: '16px', width: '100%', maxWidth: '600px', padding: '28px', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
+            <h3 style={{ margin: '0 0 16px 0', color: 'var(--ev-teal-dark, #004D4C)' }}>
+              {formData.id ? '✏️ Editar / Mover Colinha' : '➕ Nova Colinha Operacional'}
+            </h3>
+            
             <form onSubmit={salvarColinha}>
               <div style={{ marginBottom: '12px' }}>
                 <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '700', marginBottom: '4px' }}>Título</label>
-                <input type="text" required value={formData.t} onChange={(e) => setFormData({ ...formData, t: e.target.value })} style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #CBD5E1', outline: 'none' }} />
+                <input
+                  type="text"
+                  required
+                  placeholder="Ex: Confirmação de Entrega"
+                  value={formData.t}
+                  onChange={(e) => setFormData({ ...formData, t: e.target.value })}
+                  style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #CBD5E1', outline: 'none' }}
+                />
               </div>
-              
-              <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '10px', marginBottom: '12px' }}>
+
+              {/* SELETORES DINÂMICOS DE CATEGORIA E SUBCATEGORIA */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '700', marginBottom: '4px' }}>Categoria</label>
-                  <select value={formData.c} onChange={(e) => setFormData({ ...formData, c: e.target.value })} style={{ width: '100%', padding: '9px', borderRadius: '6px', border: '1px solid #CBD5E1', background: '#FFF' }}>
-                    {categoriasBase.filter(cat => cat.id !== 'Todas as Colinhas').map(cat => (
-                      <option key={cat.id} value={cat.id}>{cat.nome}</option>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '700', marginBottom: '4px' }}>Categoria Principal</label>
+                  <select
+                    required
+                    value={formData.c}
+                    onChange={(e) => {
+                      setFormData({ ...formData, c: e.target.value, sub: '' });
+                    }}
+                    style={{ width: '100%', padding: '9px', borderRadius: '6px', border: '1px solid #CBD5E1', background: '#FFF' }}
+                  >
+                    <option value="" disabled>Selecione uma categoria...</option>
+                    {categoriasPrincipais.map((cat) => (
+                      <option key={cat.id} value={cat.nome}>
+                        {cat.icone} {cat.nome}
+                      </option>
                     ))}
                   </select>
                 </div>
+
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '700', marginBottom: '4px' }}>Atalho (opcional)</label>
-                  <input type="text" placeholder="/exemplo" value={formData.atalho} onChange={(e) => setFormData({ ...formData, atalho: e.target.value })} style={{ width: '100%', padding: '9px', borderRadius: '6px', border: '1px solid #CBD5E1', outline: 'none' }} />
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '700', marginBottom: '4px' }}>Subcategoria (Opcional)</label>
+                  <select
+                    value={formData.sub}
+                    onChange={(e) => setFormData({ ...formData, sub: e.target.value })}
+                    style={{ width: '100%', padding: '9px', borderRadius: '6px', border: '1px solid #CBD5E1', background: '#FFF' }}
+                  >
+                    <option value="">Nenhuma (Fica na raiz)</option>
+                    {(() => {
+                      const catPai = categoriasPrincipais.find((cp) => cp.nome === formData.c);
+                      if (!catPai) return null;
+                      return getSubcategorias(catPai.id).map((sub) => (
+                        <option key={sub.id} value={sub.nome}>
+                          {sub.icone} {sub.nome}
+                        </option>
+                      ));
+                    })()}
+                  </select>
                 </div>
+              </div>
+
+              <div style={{ marginBottom: '12px' }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '700', marginBottom: '4px' }}>Atalho Rápido (opcional)</label>
+                <input
+                  type="text"
+                  placeholder="/pix, /extravio"
+                  value={formData.atalho}
+                  onChange={(e) => setFormData({ ...formData, atalho: e.target.value })}
+                  style={{ width: '100%', padding: '9px', borderRadius: '6px', border: '1px solid #CBD5E1', outline: 'none' }}
+                />
               </div>
 
               <div style={{ marginBottom: '16px' }}>
                 <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '700', marginBottom: '4px' }}>Texto da Colinha</label>
-                <textarea rows="7" required value={formData.txt} onChange={(e) => setFormData({ ...formData, txt: e.target.value })} style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '0.88rem', lineHeight: '1.5', outline: 'none' }} />
+                <textarea
+                  rows="7"
+                  required
+                  placeholder="Olá! Sou {agente} da Estante Virtual..."
+                  value={formData.txt}
+                  onChange={(e) => setFormData({ ...formData, txt: e.target.value })}
+                  style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '0.88rem', lineHeight: '1.5', outline: 'none' }}
+                />
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
                 <button type="button" onClick={() => setModalAberto(false)} style={{ padding: '8px 16px', borderRadius: '6px', border: 'none', background: '#F1F5F9', cursor: 'pointer', fontWeight: '600' }}>Cancelar</button>
-                <button type="submit" style={{ padding: '8px 20px', borderRadius: '6px', border: 'none', background: 'var(--ev-teal-primary)', color: '#FFF', fontWeight: '700', cursor: 'pointer' }}>Salvar no Banco</button>
+                <button type="submit" style={{ padding: '8px 20px', borderRadius: '6px', border: 'none', background: 'var(--ev-teal-primary, #006968)', color: '#FFF', fontWeight: '700', cursor: 'pointer' }}>
+                  {formData.id ? 'Atualizar no Banco' : 'Salvar no Banco'}
+                </button>
               </div>
             </form>
           </div>
@@ -720,7 +1003,102 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
         document.body
       )}
 
-      {/* 3. MODAL DE CONFIRMAÇÃO DE EXCLUSÃO (CENTRALIZADO PERFEITAMENTE NA TELA) */}
+      {/* 3. MODAL DE CRIAR CATEGORIAS E SUBCATEGORIAS */}
+      {isMounted && modalCategoria && createPortal(
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0, 30, 30, 0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
+          <div style={{ background: '#FFFFFF', borderRadius: '16px', width: '100%', maxWidth: '480px', padding: '28px', boxShadow: '0 20px 40px rgba(0,0,0,0.25)' }}>
+            <h3 style={{ margin: '0 0 16px 0', color: 'var(--ev-teal-dark, #004D4C)' }}>
+              📁 Criar Nova Categoria no Banco
+            </h3>
+
+            <form onSubmit={salvarCategoria} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '700', marginBottom: '6px' }}>Tipo de Categoria:</label>
+                <div style={{ display: 'flex', gap: '16px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.86rem', fontWeight: '600', cursor: 'pointer' }}>
+                    <input
+                      type="radio"
+                      name="tipoCat"
+                      checked={formCat.tipo === 'principal'}
+                      onChange={() => setFormCat({ ...formCat, tipo: 'principal' })}
+                    />
+                    Categoria Principal
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.86rem', fontWeight: '600', cursor: 'pointer' }}>
+                    <input
+                      type="radio"
+                      name="tipoCat"
+                      checked={formCat.tipo === 'subcategoria'}
+                      onChange={() => setFormCat({ ...formCat, tipo: 'subcategoria', parentId: categoriasPrincipais[0]?.id || '' })}
+                    />
+                    Subcategoria
+                  </label>
+                </div>
+              </div>
+
+              {formCat.tipo === 'subcategoria' && (
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '700', marginBottom: '4px' }}>Vincular à Categoria Pai:</label>
+                  <select
+                    value={formCat.parentId}
+                    onChange={(e) => setFormCat({ ...formCat, parentId: e.target.value })}
+                    style={{ width: '100%', padding: '9px', borderRadius: '6px', border: '1px solid #CBD5E1', background: '#FFF' }}
+                  >
+                    {categoriasPrincipais.map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.icone} {cat.nome}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr', gap: '10px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '700', marginBottom: '4px' }}>Ícone</label>
+                  <input
+                    type="text"
+                    required
+                    value={formCat.icone}
+                    onChange={(e) => setFormCat({ ...formCat, icone: e.target.value })}
+                    style={{ width: '100%', padding: '9px', textAlign: 'center', fontSize: '1.1rem', borderRadius: '6px', border: '1px solid #CBD5E1' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '700', marginBottom: '4px' }}>Nome da Categoria</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ex: PIX & Estornos"
+                    value={formCat.nome}
+                    onChange={(e) => setFormCat({ ...formCat, nome: e.target.value })}
+                    style={{ width: '100%', padding: '9px', borderRadius: '6px', border: '1px solid #CBD5E1' }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => setModalCategoria(false)}
+                  style={{ padding: '8px 16px', borderRadius: '6px', border: 'none', background: '#F1F5F9', fontWeight: '600', cursor: 'pointer' }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  style={{ padding: '8px 20px', borderRadius: '6px', border: 'none', background: 'var(--ev-teal-primary, #006968)', color: '#FFF', fontWeight: '700', cursor: 'pointer' }}
+                >
+                  Criar no Banco
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* 4. MODAL CONFIRMAÇÃO DE EXCLUSÃO */}
       {isMounted && colinhaParaExcluir && createPortal(
         <div style={{
           position: 'fixed',
@@ -758,7 +1136,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
               ✕
             </div>
             
-            <h3 style={{ margin: '0 0 8px 0', color: 'var(--text-dark)', fontSize: '1.2rem', fontWeight: '800' }}>
+            <h3 style={{ margin: '0 0 8px 0', color: '#0F172A', fontSize: '1.2rem', fontWeight: '800' }}>
               Remover Colinha?
             </h3>
             
@@ -806,17 +1184,17 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
         document.body
       )}
 
-      {/* 4. FEEDBACK TOAST VIA PORTAL */}
+      {/* 5. FEEDBACK TOAST */}
       {isMounted && toast.visivel && createPortal(
         <div style={{
           position: 'fixed',
           bottom: '28px',
           right: '28px',
-          background: toast.tipo === 'erro' ? '#991B1B' : 'var(--ev-teal-dark)',
+          background: toast.tipo === 'erro' ? '#991B1B' : 'var(--ev-teal-dark, #004D4C)',
           color: '#FFFFFF',
           padding: '13px 24px',
           borderRadius: '9999px',
-          border: `1.5px solid ${toast.tipo === 'erro' ? '#FCA5A5' : 'var(--ev-turquoise)'}`,
+          border: `1.5px solid ${toast.tipo === 'erro' ? '#FCA5A5' : 'var(--ev-turquoise, #5EEAD4)'}`,
           zIndex: 9999,
           fontWeight: '700',
           fontSize: '0.92rem',
