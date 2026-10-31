@@ -1,23 +1,32 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
 
-export default function ColinhasBoard({ setView, isSupervisor, usuarioLogado }) {
+// Função auxiliar pura de normalização (executada no pré-processamento)
+const normalizar = (str) =>
+  (str || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\w\s]/gi, '')
+    .trim();
+
+export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
   const [agente, setAgente] = useState('');
   const [isMounted, setIsMounted] = useState(false);
   const [termoBusca, setTermoBusca] = useState('');
   
   // Categorias do banco
   const [categorias, setCategorias] = useState([]);
-  const [filtroAtivo, setFiltroAtivo] = useState({ tipo: 'todas', id: 'todas', nome: 'Todas as Colinhas' });
+  const [filtroAtivo, setFiltroAtivo] = useState({ tipo: 'todas', id: 'todas', nome: 'Todas as Colinhas', parentId: null });
   const [expandidas, setExpandidas] = useState({});
 
-  // Toast de feedback
+  // Toast
   const [toast, setToast] = useState({ visivel: false, mensagem: '', tipo: 'sucesso' });
   
-  // Estados dos Modais
+  // Modais
   const [modalAberto, setModalAberto] = useState(false);
   const [modalNota, setModalNota] = useState(null); 
   const [colinhaParaExcluir, setColinhaParaExcluir] = useState(null);
@@ -34,7 +43,7 @@ export default function ColinhasBoard({ setView, isSupervisor, usuarioLogado }) 
     txt: ''
   });
 
-  // Formulário de Categorias / Subcategorias
+  // Formulário de Categorias
   const [formCat, setFormCat] = useState({
     tipo: 'principal',
     nome: '',
@@ -45,15 +54,6 @@ export default function ColinhasBoard({ setView, isSupervisor, usuarioLogado }) 
   const modalContainerRef = useRef(null);
   const modalTextRef = useRef(null);
   const [colinhas, setColinhas] = useState([]);
-
-  // Função auxiliar para normalizar e comparar nomes ignorando acentos, emojis e espaços
-  const normalizar = (str) =>
-    (str || '')
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^\w\s]/gi, '')
-      .trim();
 
   const dispararToast = (mensagem, tipo = 'sucesso') => {
     setToast({ visivel: true, mensagem, tipo });
@@ -90,7 +90,7 @@ export default function ColinhasBoard({ setView, isSupervisor, usuarioLogado }) 
     }
   };
 
-  // 2. CARREGAR COLINHAS DO BANCO
+  // 2. CARREGAR COLINHAS COM PRÉ-PROCESSAMENTO OTIMIZADO
   const buscarColinhas = async () => {
     try {
       const { data, error } = await supabase
@@ -100,16 +100,20 @@ export default function ColinhasBoard({ setView, isSupervisor, usuarioLogado }) 
 
       if (error) throw error;
       if (data) {
-        setColinhas(
-          data.map((item) => ({
-            id: item.id,
-            t: item.titulo,
-            c: item.categoria,
-            sub: item.subcategoria || '',
-            txt: item.conteudo,
-            atalho: item.atalho || ''
-          }))
-        );
+        // Pré-normaliza os campos para evitar computações pesadas durante a filtragem
+        const processadas = data.map((item) => ({
+          id: item.id,
+          t: item.titulo,
+          c: item.categoria,
+          sub: item.subcategoria || '',
+          txt: item.conteudo,
+          atalho: item.atalho || '',
+          fixado: Boolean(item.fixado),
+          cNorm: normalizar(item.categoria),
+          subNorm: normalizar(item.subcategoria || ''),
+          buscaIndex: normalizar(`${item.titulo} ${item.conteudo} ${item.atalho || ''}`)
+        }));
+        setColinhas(processadas);
       }
     } catch (err) {
       console.error('Erro ao buscar colinhas:', err);
@@ -169,8 +173,47 @@ export default function ColinhasBoard({ setView, isSupervisor, usuarioLogado }) 
     return final;
   };
 
-  const categoriasPrincipais = categorias.filter((c) => !c.parent_id);
-  const getSubcategorias = (parentId) => categorias.filter((c) => c.parent_id === parentId);
+  // Mapeamento em árvore memorizado para performance instantânea
+  const { categoriasPrincipais, subcategoriasPorPai } = useMemo(() => {
+    const principais = [];
+    const subsMap = {};
+
+    categorias.forEach((cat) => {
+      if (!cat.parent_id) {
+        principais.push(cat);
+      } else {
+        if (!subsMap[cat.parent_id]) subsMap[cat.parent_id] = [];
+        subsMap[cat.parent_id].push(cat);
+      }
+    });
+
+    return { categoriasPrincipais: principais, subcategoriasPorPai: subsMap };
+  }, [categorias]);
+
+  // 3. FUNÇÃO PARA FIXAR / DESAFIXAR COLINHA NO BANCO
+  const alternarFixarColinha = async (e, colinha) => {
+    e.stopPropagation();
+    const novoStatus = !colinha.fixado;
+
+    // Atualização otimista imediata na UI
+    setColinhas((prev) =>
+      prev.map((c) => (c.id === colinha.id ? { ...c, fixado: novoStatus } : c))
+    );
+
+    try {
+      const { error } = await supabase
+        .from('colinhas')
+        .update({ fixado: novoStatus })
+        .eq('id', colinha.id);
+
+      if (error) throw error;
+      dispararToast(novoStatus ? '📌 Colinha fixada no topo!' : 'Colinha desafixada!', 'sucesso');
+    } catch (err) {
+      console.error('Erro ao fixar colinha:', err);
+      dispararToast('Erro ao atualizar status: ' + err.message, 'erro');
+      await buscarColinhas(); // Reverte caso haja erro
+    }
+  };
 
   const abrirModalCriar = () => {
     const catPadrao = categoriasPrincipais[0]?.nome || 'Relacionamento & Finalização';
@@ -181,12 +224,11 @@ export default function ColinhasBoard({ setView, isSupervisor, usuarioLogado }) 
   const abrirModalEditar = (e, item) => {
     if (e) e.stopPropagation();
 
-    // Localiza a categoria pai mesmo se a colinha tiver nome legado
     const catEncontrada = categoriasPrincipais.find(
       (cp) =>
-        normalizar(cp.nome) === normalizar(item.c) ||
-        normalizar(cp.nome).includes(normalizar(item.c)) ||
-        normalizar(item.c).includes(normalizar(cp.nome))
+        normalizar(cp.nome) === item.cNorm ||
+        normalizar(cp.nome).includes(item.cNorm) ||
+        item.cNorm.includes(normalizar(cp.nome))
     );
 
     setFormData({
@@ -200,7 +242,6 @@ export default function ColinhasBoard({ setView, isSupervisor, usuarioLogado }) 
     setModalAberto(true);
   };
 
-  // 3. SALVAR / MOVER COLINHA
   const salvarColinha = async (e) => {
     e.preventDefault();
     if (!formData.t.trim() || !formData.txt.trim() || !formData.c) {
@@ -235,7 +276,8 @@ export default function ColinhasBoard({ setView, isSupervisor, usuarioLogado }) 
               subcategoria: formData.sub || null,
               conteudo: formData.txt,
               atalho: formData.atalho || '',
-              autor_nome: autor
+              autor_nome: autor,
+              fixado: false
             }
           ]);
 
@@ -251,7 +293,6 @@ export default function ColinhasBoard({ setView, isSupervisor, usuarioLogado }) 
     }
   };
 
-  // 4. EXCLUIR COLINHA
   const confirmarExclusao = async () => {
     if (!colinhaParaExcluir) return;
     setExcluindo(true);
@@ -270,7 +311,6 @@ export default function ColinhasBoard({ setView, isSupervisor, usuarioLogado }) 
     }
   };
 
-  // 5. SALVAR NOVA CATEGORIA / SUBCATEGORIA
   const salvarCategoria = async (e) => {
     e.preventDefault();
     if (!formCat.nome.trim()) {
@@ -308,7 +348,6 @@ export default function ColinhasBoard({ setView, isSupervisor, usuarioLogado }) 
     }
   };
 
-  // 6. EXCLUIR CATEGORIA
   const excluirCategoria = async (e, id, nome) => {
     e.stopPropagation();
     if (!window.confirm(`Tem certeza de que deseja excluir "${nome}"? Subcategorias e vínculos serão afetados.`)) return;
@@ -319,7 +358,7 @@ export default function ColinhasBoard({ setView, isSupervisor, usuarioLogado }) 
 
       dispararToast(`Categoria "${nome}" removida!`, 'sucesso');
       if (filtroAtivo.id === id) {
-        setFiltroAtivo({ tipo: 'todas', id: 'todas', nome: 'Todas as Colinhas' });
+        setFiltroAtivo({ tipo: 'todas', id: 'todas', nome: 'Todas as Colinhas', parentId: null });
       }
       await buscarCategorias();
     } catch (err) {
@@ -328,39 +367,38 @@ export default function ColinhasBoard({ setView, isSupervisor, usuarioLogado }) 
     }
   };
 
-  // FILTRAGEM INTELIGENTE
-  const colinhasFiltradas = colinhas.filter((c) => {
-    let bateCategoria = true;
+  // FILTRAGEM + ORDENAÇÃO INSTANTÂNEAS VIA USEMEMO (FIXADAS SEMPRE NO TOPO)
+  const colinhasFiltradas = useMemo(() => {
+    const termo = normalizar(termoBusca);
+    const filtroNomeNorm = normalizar(filtroAtivo.nome);
 
-    if (filtroAtivo.tipo === 'principal') {
-      const catColinha = normalizar(c.c);
-      const catFiltro = normalizar(filtroAtivo.nome);
+    return colinhas
+      .filter((c) => {
+        let bateCategoria = true;
 
-      bateCategoria =
-        c.c === filtroAtivo.nome ||
-        catColinha === catFiltro ||
-        catFiltro.includes(catColinha) ||
-        catColinha.includes(catFiltro);
-    } else if (filtroAtivo.tipo === 'subcategoria') {
-      const subColinha = normalizar(c.sub);
-      const subFiltro = normalizar(filtroAtivo.nome);
+        if (filtroAtivo.tipo === 'principal') {
+          bateCategoria =
+            c.c === filtroAtivo.nome ||
+            c.cNorm === filtroNomeNorm ||
+            filtroNomeNorm.includes(c.cNorm) ||
+            c.cNorm.includes(filtroNomeNorm);
+        } else if (filtroAtivo.tipo === 'subcategoria') {
+          bateCategoria =
+            c.sub === filtroAtivo.nome ||
+            c.subNorm === filtroNomeNorm ||
+            filtroNomeNorm.includes(c.subNorm) ||
+            c.subNorm.includes(filtroNomeNorm);
+        }
 
-      bateCategoria =
-        c.sub === filtroAtivo.nome ||
-        subColinha === subFiltro ||
-        subFiltro.includes(subColinha) ||
-        subColinha.includes(subFiltro);
-    }
-
-    const termo = termoBusca.toLowerCase().trim();
-    const bateBusca =
-      termo === '' ||
-      c.t.toLowerCase().includes(termo) ||
-      c.txt.toLowerCase().includes(termo) ||
-      (c.atalho && c.atalho.toLowerCase().includes(termo));
-
-    return bateCategoria && bateBusca;
-  });
+        const bateBusca = termo === '' || c.buscaIndex.includes(termo);
+        return bateCategoria && bateBusca;
+      })
+      .sort((a, b) => {
+        // Fixadas primeiro (b.fixado - a.fixado), depois ordem alfabética
+        if (a.fixado !== b.fixado) return b.fixado ? 1 : -1;
+        return a.t.localeCompare(b.t);
+      });
+  }, [colinhas, filtroAtivo, termoBusca]);
 
   return (
     <div style={{ maxWidth: '1440px', margin: '0 auto', padding: '36px 20px 80px 20px' }}>
@@ -433,7 +471,7 @@ export default function ColinhasBoard({ setView, isSupervisor, usuarioLogado }) 
       {/* LAYOUT: MENU LATERAL + LISTAGEM */}
       <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: '28px', alignItems: 'start' }}>
         
-        {/* MENU LATERAL */}
+        {/* MENU LATERAL COM PROTEÇÃO CONTRA FECHAMENTO DE SUBCATEGORIA */}
         <aside style={{ 
           display: 'flex', 
           flexDirection: 'column', 
@@ -446,7 +484,7 @@ export default function ColinhasBoard({ setView, isSupervisor, usuarioLogado }) 
         }}>
           
           <button
-            onClick={() => setFiltroAtivo({ tipo: 'todas', id: 'todas', nome: 'Todas as Colinhas' })}
+            onClick={() => setFiltroAtivo({ tipo: 'todas', id: 'todas', nome: 'Todas as Colinhas', parentId: null })}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -468,13 +506,19 @@ export default function ColinhasBoard({ setView, isSupervisor, usuarioLogado }) 
 
           {categoriasPrincipais.map((cat) => {
             const isAtiva = filtroAtivo.tipo === 'principal' && filtroAtivo.id === cat.id;
-            const subs = getSubcategorias(cat.id);
-            const isExpandida = expandidas[cat.id];
+            const subs = subcategoriasPorPai[cat.id] || [];
+            
+            // Permanece aberto se o usuário expandiu explicitamente OU se alguma subcategoria está ativa
+            const isSubAtivaDestePai = filtroAtivo.tipo === 'subcategoria' && filtroAtivo.parentId === cat.id;
+            const isOpen = Boolean(expandidas[cat.id] || isSubAtivaDestePai || isAtiva);
 
             return (
               <div key={cat.id} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                 <div
-                  onClick={() => setFiltroAtivo({ tipo: 'principal', id: cat.id, nome: cat.nome })}
+                  onClick={() => {
+                    setExpandidas((prev) => ({ ...prev, [cat.id]: true }));
+                    setFiltroAtivo({ tipo: 'principal', id: cat.id, nome: cat.nome, parentId: null });
+                  }}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -500,7 +544,7 @@ export default function ColinhasBoard({ setView, isSupervisor, usuarioLogado }) 
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          setExpandidas({ ...expandidas, [cat.id]: !isExpandida });
+                          setExpandidas((prev) => ({ ...prev, [cat.id]: !isOpen }));
                         }}
                         style={{
                           background: 'none',
@@ -510,9 +554,9 @@ export default function ColinhasBoard({ setView, isSupervisor, usuarioLogado }) 
                           fontSize: '0.72rem',
                           padding: '2px 4px'
                         }}
-                        title="Ver subcategorias"
+                        title={isOpen ? 'Recolher' : 'Expandir subcategorias'}
                       >
-                        {isExpandida ? '▼' : '▶'}
+                        {isOpen ? '▼' : '▶'}
                       </button>
                     )}
 
@@ -537,14 +581,20 @@ export default function ColinhasBoard({ setView, isSupervisor, usuarioLogado }) 
                   </div>
                 </div>
 
-                {subs.length > 0 && (isExpandida || isAtiva) && (
+                {/* SUBCATEGORIAS FIXAS AO CLICAR */}
+                {subs.length > 0 && isOpen && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', paddingLeft: '32px', borderLeft: '2px solid #E2E8F0', marginLeft: '16px' }}>
                     {subs.map((sub) => {
                       const isSubAtiva = filtroAtivo.tipo === 'subcategoria' && filtroAtivo.id === sub.id;
                       return (
                         <div
                           key={sub.id}
-                          onClick={() => setFiltroAtivo({ tipo: 'subcategoria', id: sub.id, nome: sub.nome })}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            // Garante que o pai continue expandido ao selecionar a subcategoria
+                            setExpandidas((prev) => ({ ...prev, [cat.id]: true }));
+                            setFiltroAtivo({ tipo: 'subcategoria', id: sub.id, nome: sub.nome, parentId: cat.id });
+                          }}
                           style={{
                             display: 'flex',
                             alignItems: 'center',
@@ -643,13 +693,13 @@ export default function ColinhasBoard({ setView, isSupervisor, usuarioLogado }) 
                       onClick={() => setModalNota(c)}
                       style={{
                         backgroundColor: cores.bg,
-                        border: `1px solid ${cores.border}`,
+                        border: c.fixado ? '2px solid #006968' : `1px solid ${cores.border}`,
                         borderRadius: '16px',
                         padding: '20px',
                         cursor: 'pointer',
                         transition: 'transform 0.18s ease, box-shadow 0.18s ease',
                         position: 'relative',
-                        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)'
+                        boxShadow: c.fixado ? '0 6px 16px rgba(0, 105, 104, 0.12)' : '0 2px 8px rgba(0, 0, 0, 0.04)'
                       }}
                       onMouseEnter={(e) => {
                         e.currentTarget.style.transform = 'translateY(-4px)';
@@ -657,11 +707,16 @@ export default function ColinhasBoard({ setView, isSupervisor, usuarioLogado }) 
                       }}
                       onMouseLeave={(e) => {
                         e.currentTarget.style.transform = 'translateY(0)';
-                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.04)';
+                        e.currentTarget.style.boxShadow = c.fixado ? '0 6px 16px rgba(0, 105, 104, 0.12)' : '0 2px 8px rgba(0, 0, 0, 0.04)';
                       }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                         <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                          {c.fixado && (
+                            <span style={{ fontSize: '0.68rem', fontWeight: '800', background: '#004D4C', color: '#FFF', padding: '2px 8px', borderRadius: '4px' }}>
+                              📌 FIXADA
+                            </span>
+                          )}
                           <span style={{ fontSize: '0.7rem', fontWeight: '800', textTransform: 'uppercase', color: 'rgba(0, 0, 0, 0.55)', letterSpacing: '0.4px' }}>
                             {c.c}
                           </span>
@@ -672,8 +727,26 @@ export default function ColinhasBoard({ setView, isSupervisor, usuarioLogado }) 
                           )}
                         </div>
 
+                        {/* BOTÕES DE AÇÃO: FIXAR, EDITAR, EXCLUIR */}
                         {isSupervisor && (
                           <div style={{ display: 'flex', gap: '6px' }} onClick={(e) => e.stopPropagation()}>
+                            <button
+                              onClick={(e) => alternarFixarColinha(e, c)}
+                              title={c.fixado ? 'Desafixar colinha' : 'Fixar colinha no topo'}
+                              style={{
+                                background: c.fixado ? '#006968' : '#FFFFFF',
+                                color: c.fixado ? '#FFFFFF' : '#475569',
+                                border: '1px solid #CBD5E1',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                padding: '3px 8px',
+                                fontSize: '0.76rem',
+                                fontWeight: '700'
+                              }}
+                            >
+                              📌
+                            </button>
+
                             <button
                               onClick={(e) => abrirModalEditar(e, c)}
                               title="Editar e Mover Colinha"
@@ -925,7 +998,7 @@ export default function ColinhasBoard({ setView, isSupervisor, usuarioLogado }) 
         document.body
       )}
 
-      {/* MODAL 2: CRIAR / EDITAR / MOVER COLINHA */}
+      {/* MODAL 2: CRIAR / EDITAR / MOVER */}
       {isMounted && modalAberto && createPortal(
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0, 30, 30, 0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
           <div style={{ background: '#FFFFFF', borderRadius: '16px', width: '100%', maxWidth: '600px', padding: '28px', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
@@ -952,9 +1025,7 @@ export default function ColinhasBoard({ setView, isSupervisor, usuarioLogado }) 
                   <select
                     required
                     value={formData.c}
-                    onChange={(e) => {
-                      setFormData({ ...formData, c: e.target.value, sub: '' });
-                    }}
+                    onChange={(e) => setFormData({ ...formData, c: e.target.value, sub: '' })}
                     style={{ width: '100%', padding: '9px', borderRadius: '6px', border: '1px solid #CBD5E1', background: '#FFF' }}
                   >
                     <option value="" disabled>Selecione uma categoria...</option>
@@ -982,7 +1053,8 @@ export default function ColinhasBoard({ setView, isSupervisor, usuarioLogado }) 
                           normalizar(formData.c).includes(normalizar(cp.nome))
                       );
                       if (!catPai) return null;
-                      return getSubcategorias(catPai.id).map((sub) => (
+                      const subs = subcategoriasPorPai[catPai.id] || [];
+                      return subs.map((sub) => (
                         <option key={sub.id} value={sub.nome}>
                           {sub.icone} {sub.nome}
                         </option>
@@ -1027,7 +1099,7 @@ export default function ColinhasBoard({ setView, isSupervisor, usuarioLogado }) 
         document.body
       )}
 
-      {/* MODAL 3: CRIAR CATEGORIAS E SUBCATEGORIAS */}
+      {/* MODAL 3: CRIAR CATEGORIA / SUBCATEGORIA */}
       {isMounted && modalCategoria && createPortal(
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0, 30, 30, 0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
           <div style={{ background: '#FFFFFF', borderRadius: '16px', width: '100%', maxWidth: '480px', padding: '28px', boxShadow: '0 20px 40px rgba(0,0,0,0.25)' }}>
@@ -1208,7 +1280,7 @@ export default function ColinhasBoard({ setView, isSupervisor, usuarioLogado }) 
         document.body
       )}
 
-      {/* MODAL 5: FEEDBACK TOAST */}
+      {/* FEEDBACK TOAST */}
       {isMounted && toast.visivel && createPortal(
         <div style={{
           position: 'fixed',
