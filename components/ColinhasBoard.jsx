@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
 
-export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
+export default function ColinhasBoard({ setView, isSupervisor, usuarioLogado }) {
   const [agente, setAgente] = useState('');
   const [isMounted, setIsMounted] = useState(false);
   const [termoBusca, setTermoBusca] = useState('');
@@ -14,17 +14,17 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
   const [filtroAtivo, setFiltroAtivo] = useState({ tipo: 'todas', id: 'todas', nome: 'Todas as Colinhas' });
   const [expandidas, setExpandidas] = useState({});
 
-  // Toast elegante
+  // Toast de feedback
   const [toast, setToast] = useState({ visivel: false, mensagem: '', tipo: 'sucesso' });
   
-  // Modais
+  // Estados dos Modais
   const [modalAberto, setModalAberto] = useState(false);
   const [modalNota, setModalNota] = useState(null); 
   const [colinhaParaExcluir, setColinhaParaExcluir] = useState(null);
   const [excluindo, setExcluindo] = useState(false);
   const [modalCategoria, setModalCategoria] = useState(false);
 
-  // Form Colinha
+  // Formulário de Colinhas
   const [formData, setFormData] = useState({
     id: null,
     t: '',
@@ -34,9 +34,9 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
     txt: ''
   });
 
-  // Form Categoria / Subcategoria
+  // Formulário de Categorias / Subcategorias
   const [formCat, setFormCat] = useState({
-    tipo: 'principal', // 'principal' | 'subcategoria'
+    tipo: 'principal',
     nome: '',
     icone: '📁',
     parentId: ''
@@ -46,28 +46,36 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
   const modalTextRef = useRef(null);
   const [colinhas, setColinhas] = useState([]);
 
+  // Função auxiliar para normalizar e comparar nomes ignorando acentos, emojis e espaços
+  const normalizar = (str) =>
+    (str || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^\w\s]/gi, '')
+      .trim();
+
   const dispararToast = (mensagem, tipo = 'sucesso') => {
     setToast({ visivel: true, mensagem, tipo });
     setTimeout(() => setToast({ visivel: false, mensagem: '', tipo: 'sucesso' }), 2800);
   };
 
-  // Cores dinâmicas
   const getCor = (catNome) => {
-    if (!catNome) return { bg: '#FFFFFF', border: '#CBD5E1' };
-    if (catNome.includes('Relacionamento')) return { bg: '#F5EEF8', border: '#D7BDE2' };
-    if (catNome.includes('Máscaras')) return { bg: '#F2F4F4', border: '#D5D8DC' };
-    if (catNome.includes('Entrega') || catNome.includes('Rastreio')) return { bg: '#E8F8F5', border: '#A3E4D7' };
-    if (catNome.includes('Atrasos')) return { bg: '#FEF9E7', border: '#F9E79F' };
-    if (catNome.includes('Vendedor')) return { bg: '#FDF2E9', border: '#F5CBA7' };
-    if (catNome.includes('Trocas')) return { bg: '#F9EBEA', border: '#F2D7D5' };
-    if (catNome.includes('Cancelamento')) return { bg: '#FDEDEC', border: '#F5B7B1' };
-    if (catNome.includes('Financeiro')) return { bg: '#EAF2F8', border: '#A9CCE3' };
-    if (catNome.includes('Cadastro')) return { bg: '#EAFAF1', border: '#A9DFBF' };
-    if (catNome.includes('Plataforma')) return { bg: '#F4ECF7', border: '#D2B4DE' };
+    const nome = normalizar(catNome);
+    if (nome.includes('relacionamento')) return { bg: '#F5EEF8', border: '#D7BDE2' };
+    if (nome.includes('mascara')) return { bg: '#F2F4F4', border: '#D5D8DC' };
+    if (nome.includes('entrega') || nome.includes('rastreio')) return { bg: '#E8F8F5', border: '#A3E4D7' };
+    if (nome.includes('atraso') || nome.includes('extravio')) return { bg: '#FEF9E7', border: '#F9E79F' };
+    if (nome.includes('vendedor') || nome.includes('standby')) return { bg: '#FDF2E9', border: '#F5CBA7' };
+    if (nome.includes('troca') || nome.includes('devolu')) return { bg: '#F9EBEA', border: '#F2D7D5' };
+    if (nome.includes('cancelamento') || nome.includes('reembolso')) return { bg: '#FDEDEC', border: '#F5B7B1' };
+    if (nome.includes('financeiro') || nome.includes('pagamento')) return { bg: '#EAF2F8', border: '#A9CCE3' };
+    if (nome.includes('cadastro') || nome.includes('login')) return { bg: '#EAFAF1', border: '#A9DFBF' };
+    if (nome.includes('plataforma') || nome.includes('carrinho')) return { bg: '#F4ECF7', border: '#D2B4DE' };
     return { bg: '#FFFFFF', border: '#CBD5E1' };
   };
 
-  // 1. BUSCA CATEGORIAS NO BANCO
+  // 1. CARREGAR CATEGORIAS DO BANCO
   const buscarCategorias = async () => {
     try {
       const { data, error } = await supabase
@@ -82,7 +90,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
     }
   };
 
-  // 2. BUSCA COLINHAS NO BANCO
+  // 2. CARREGAR COLINHAS DO BANCO
   const buscarColinhas = async () => {
     try {
       const { data, error } = await supabase
@@ -109,18 +117,21 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
   };
 
   useEffect(() => {
+    setIsMounted(true);
+    const salvo = localStorage.getItem('capitu_agente_nome');
+    if (salvo) setAgente(salvo);
+
     buscarCategorias();
     buscarColinhas();
-    setIsMounted(true);
 
-    const canalColinhas = supabase
-      .channel('colinhas_realtime_full')
+    const canal = supabase
+      .channel('colinhas_realtime_board')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'colinhas' }, () => buscarColinhas())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'categorias_colinhas' }, () => buscarCategorias())
       .subscribe();
 
     return () => {
-      supabase.removeChannel(canalColinhas);
+      supabase.removeChannel(canal);
     };
   }, []);
 
@@ -129,11 +140,6 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
       modalContainerRef.current.focus({ preventScroll: true });
     }
   }, [modalNota]);
-
-  useEffect(() => {
-    const salvo = localStorage.getItem('capitu_agente_nome');
-    if (salvo) setAgente(salvo);
-  }, []);
 
   const handleAgenteChange = (e) => {
     const valor = e.target.value;
@@ -163,18 +169,30 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
     return final;
   };
 
+  const categoriasPrincipais = categorias.filter((c) => !c.parent_id);
+  const getSubcategorias = (parentId) => categorias.filter((c) => c.parent_id === parentId);
+
   const abrirModalCriar = () => {
-    const catPadrao = categorias.find((c) => !c.parent_id)?.nome || '';
+    const catPadrao = categoriasPrincipais[0]?.nome || 'Relacionamento & Finalização';
     setFormData({ id: null, t: '', c: catPadrao, sub: '', atalho: '', txt: '' });
     setModalAberto(true);
   };
 
   const abrirModalEditar = (e, item) => {
     if (e) e.stopPropagation();
+
+    // Localiza a categoria pai mesmo se a colinha tiver nome legado
+    const catEncontrada = categoriasPrincipais.find(
+      (cp) =>
+        normalizar(cp.nome) === normalizar(item.c) ||
+        normalizar(cp.nome).includes(normalizar(item.c)) ||
+        normalizar(item.c).includes(normalizar(cp.nome))
+    );
+
     setFormData({
       id: item.id,
       t: item.t,
-      c: item.c,
+      c: catEncontrada ? catEncontrada.nome : item.c,
       sub: item.sub || '',
       atalho: item.atalho || '',
       txt: item.txt
@@ -182,7 +200,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
     setModalAberto(true);
   };
 
-  // 3. SALVAR / EDITAR / MOVER COLINHA
+  // 3. SALVAR / MOVER COLINHA
   const salvarColinha = async (e) => {
     e.preventDefault();
     if (!formData.t.trim() || !formData.txt.trim() || !formData.c) {
@@ -192,7 +210,6 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
 
     try {
       if (formData.id) {
-        // Atualiza e move a colinha se a categoria/subcategoria tiver sido alterada
         const { error } = await supabase
           .from('colinhas')
           .update({
@@ -206,7 +223,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
           .eq('id', formData.id);
 
         if (error) throw error;
-        dispararToast('✅ Colinha e categoria atualizadas com sucesso!', 'sucesso');
+        dispararToast('✅ Colinha atualizada com sucesso!', 'sucesso');
       } else {
         const autor = usuarioLogado?.nome || 'Supervisão EV';
         const { error } = await supabase
@@ -223,7 +240,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
           ]);
 
         if (error) throw error;
-        dispararToast('✨ Nova colinha salva no banco!', 'sucesso');
+        dispararToast('✨ Nova colinha cadastrada!', 'sucesso');
       }
 
       setModalAberto(false);
@@ -253,7 +270,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
     }
   };
 
-  // 5. CRIAR CATEGORIA / SUBCATEGORIA
+  // 5. SALVAR NOVA CATEGORIA / SUBCATEGORIA
   const salvarCategoria = async (e) => {
     e.preventDefault();
     if (!formCat.nome.trim()) {
@@ -262,7 +279,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
     }
 
     if (formCat.tipo === 'subcategoria' && !formCat.parentId) {
-      dispararToast('Selecione a categoria pai.', 'erro');
+      dispararToast('Selecione uma categoria principal.', 'erro');
       return;
     }
 
@@ -286,12 +303,12 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
       setFormCat({ tipo: 'principal', nome: '', icone: '📁', parentId: '' });
       await buscarCategorias();
     } catch (err) {
-      console.error('Erro ao criar categoria:', err);
+      console.error('Erro ao salvar categoria:', err);
       dispararToast('Erro ao salvar categoria: ' + err.message, 'erro');
     }
   };
 
-  // 6. EXCLUIR CATEGORIA DO BANCO
+  // 6. EXCLUIR CATEGORIA
   const excluirCategoria = async (e, id, nome) => {
     e.stopPropagation();
     if (!window.confirm(`Tem certeza de que deseja excluir "${nome}"? Subcategorias e vínculos serão afetados.`)) return;
@@ -311,17 +328,28 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
     }
   };
 
-  // Organização em Árvore
-  const categoriasPrincipais = categorias.filter((c) => !c.parent_id);
-  const getSubcategorias = (parentId) => categorias.filter((c) => c.parent_id === parentId);
-
-  // Filtragem
+  // FILTRAGEM INTELIGENTE
   const colinhasFiltradas = colinhas.filter((c) => {
     let bateCategoria = true;
+
     if (filtroAtivo.tipo === 'principal') {
-      bateCategoria = c.c === filtroAtivo.nome;
+      const catColinha = normalizar(c.c);
+      const catFiltro = normalizar(filtroAtivo.nome);
+
+      bateCategoria =
+        c.c === filtroAtivo.nome ||
+        catColinha === catFiltro ||
+        catFiltro.includes(catColinha) ||
+        catColinha.includes(catFiltro);
     } else if (filtroAtivo.tipo === 'subcategoria') {
-      bateCategoria = c.sub === filtroAtivo.nome;
+      const subColinha = normalizar(c.sub);
+      const subFiltro = normalizar(filtroAtivo.nome);
+
+      bateCategoria =
+        c.sub === filtroAtivo.nome ||
+        subColinha === subFiltro ||
+        subFiltro.includes(subColinha) ||
+        subColinha.includes(subFiltro);
     }
 
     const termo = termoBusca.toLowerCase().trim();
@@ -342,7 +370,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
         background: '#FFFFFF',
         borderRadius: '16px',
         padding: '16px 24px',
-        border: '1px solid var(--border-subtle, #E2E8F0)',
+        border: '1px solid #E2E8F0',
         boxShadow: '0 2px 8px rgba(0, 77, 76, 0.05)',
         marginBottom: '32px',
         display: 'flex',
@@ -352,7 +380,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
         gap: '16px'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: 1, minWidth: '300px' }}>
-          <span style={{ fontSize: '1.25rem', color: 'var(--ev-teal-primary, #006968)' }}>🔍</span>
+          <span style={{ fontSize: '1.25rem', color: '#006968' }}>🔍</span>
           <input
             type="text"
             placeholder="Pesquise por qualquer termo, atalho (/pix), regra de frete..."
@@ -370,7 +398,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', borderLeft: '1px solid #E2E8F0', paddingLeft: '16px' }}>
-          <label style={{ fontSize: '0.88rem', fontWeight: '700', color: 'var(--ev-teal-dark, #004D4C)' }}>✍️ Assinatura:</label>
+          <label style={{ fontSize: '0.88rem', fontWeight: '700', color: '#004D4C' }}>✍️ Assinatura:</label>
           <input
             type="text"
             placeholder="Ex: Mariana"
@@ -383,7 +411,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
             <button
               onClick={abrirModalCriar}
               style={{
-                background: 'var(--ev-teal-primary, #006968)',
+                background: '#006968',
                 color: '#FFF',
                 border: 'none',
                 padding: '9px 18px',
@@ -405,7 +433,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
       {/* LAYOUT: MENU LATERAL + LISTAGEM */}
       <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: '28px', alignItems: 'start' }}>
         
-        {/* MENU LATERAL COM GERENCIAMENTO DE CATEGORIAS */}
+        {/* MENU LATERAL */}
         <aside style={{ 
           display: 'flex', 
           flexDirection: 'column', 
@@ -417,7 +445,6 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
           paddingRight: '6px'
         }}>
           
-          {/* BOTÃO TODAS AS COLINHAS */}
           <button
             onClick={() => setFiltroAtivo({ tipo: 'todas', id: 'todas', nome: 'Todas as Colinhas' })}
             style={{
@@ -426,9 +453,9 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
               gap: '12px',
               padding: '12px 14px',
               borderRadius: '12px',
-              border: filtroAtivo.id === 'todas' ? '2px solid var(--ev-teal-primary, #006968)' : '1px solid transparent',
+              border: filtroAtivo.id === 'todas' ? '2px solid #006968' : '1px solid transparent',
               background: filtroAtivo.id === 'todas' ? 'rgba(0, 105, 104, 0.08)' : 'transparent',
-              color: filtroAtivo.id === 'todas' ? 'var(--ev-teal-primary, #006968)' : '#64748B',
+              color: filtroAtivo.id === 'todas' ? '#006968' : '#64748B',
               cursor: 'pointer',
               textAlign: 'left',
               fontWeight: filtroAtivo.id === 'todas' ? '800' : '600',
@@ -439,7 +466,6 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
             <div>Todas as Colinhas</div>
           </button>
 
-          {/* LISTA DINÂMICA DE CATEGORIAS E SUBCATEGORIAS */}
           {categoriasPrincipais.map((cat) => {
             const isAtiva = filtroAtivo.tipo === 'principal' && filtroAtivo.id === cat.id;
             const subs = getSubcategorias(cat.id);
@@ -455,9 +481,9 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
                     justifyContent: 'space-between',
                     padding: '10px 12px',
                     borderRadius: '10px',
-                    border: isAtiva ? '2px solid var(--ev-teal-primary, #006968)' : '1px solid transparent',
+                    border: isAtiva ? '2px solid #006968' : '1px solid transparent',
                     background: isAtiva ? 'rgba(0, 105, 104, 0.08)' : 'transparent',
-                    color: isAtiva ? 'var(--ev-teal-primary, #006968)' : '#334155',
+                    color: isAtiva ? '#006968' : '#334155',
                     cursor: 'pointer',
                     transition: 'all 0.15s ease'
                   }}
@@ -511,7 +537,6 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
                   </div>
                 </div>
 
-                {/* SUBCATEGORIAS ANINHADAS */}
                 {subs.length > 0 && (isExpandida || isAtiva) && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', paddingLeft: '32px', borderLeft: '2px solid #E2E8F0', marginLeft: '16px' }}>
                     {subs.map((sub) => {
@@ -564,7 +589,6 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
             );
           })}
 
-          {/* BOTÃO GERENCIAR CATEGORIAS PARA SUPERVISOR */}
           {isSupervisor && (
             <button
               onClick={() => {
@@ -575,9 +599,9 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
                 marginTop: '12px',
                 padding: '9px 12px',
                 borderRadius: '10px',
-                border: '1.5px dashed var(--ev-teal-primary, #006968)',
+                border: '1.5px dashed #006968',
                 background: '#F0FDFA',
-                color: 'var(--ev-teal-primary, #006968)',
+                color: '#006968',
                 fontWeight: '700',
                 fontSize: '0.84rem',
                 cursor: 'pointer',
@@ -595,7 +619,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
         {/* ÁREA DOS CARDS */}
         <main style={{ minHeight: '600px' }}>
           <div style={{ marginBottom: '20px' }}>
-            <h2 style={{ fontSize: '1.4rem', fontWeight: '800', color: 'var(--ev-teal-dark, #004D4C)', margin: '0 0 6px 0' }}>
+            <h2 style={{ fontSize: '1.4rem', fontWeight: '800', color: '#004D4C', margin: '0 0 6px 0' }}>
               {filtroAtivo.nome}
             </h2>
             <p style={{ margin: 0, fontSize: '0.9rem', color: '#64748B' }}>
@@ -707,7 +731,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
                         <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '36px', background: `linear-gradient(transparent, ${cores.bg})` }}></div>
                       </div>
 
-                      <div style={{ marginTop: '14px', paddingTop: '10px', borderTop: '1px dashed rgba(0, 0, 0, 0.1)', textAlign: 'right', fontSize: '0.76rem', fontWeight: '700', color: 'var(--ev-teal-primary, #006968)' }}>
+                      <div style={{ marginTop: '14px', paddingTop: '10px', borderTop: '1px dashed rgba(0, 0, 0, 0.1)', textAlign: 'right', fontSize: '0.76rem', fontWeight: '700', color: '#006968' }}>
                         Clique para expandir nota 🔍
                       </div>
                     </div>
@@ -719,11 +743,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
         </main>
       </div>
 
-      {/* ========================================================
-          MODAIS RENDERIZADOS VIA PORTAL
-      ======================================================== */}
-
-      {/* 1. MODAL DETALHES DE LEITURA */}
+      {/* MODAL 1: VISUALIZAR TEXTO COMPLETO */}
       {isMounted && modalNota && createPortal(
         <div
           style={{
@@ -770,7 +790,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
               <div>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.75rem', fontWeight: '800', textTransform: 'uppercase', color: 'var(--ev-teal-primary, #006968)' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: '800', textTransform: 'uppercase', color: '#006968' }}>
                     {modalNota.c}
                   </span>
                   {modalNota.sub && (
@@ -779,7 +799,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
                     </span>
                   )}
                 </div>
-                <h3 style={{ margin: '4px 0 0 0', color: 'var(--ev-teal-dark, #004D4C)', fontSize: '1.35rem', fontWeight: '800' }}>
+                <h3 style={{ margin: '4px 0 0 0', color: '#004D4C', fontSize: '1.35rem', fontWeight: '800' }}>
                   {modalNota.t}
                 </h3>
               </div>
@@ -889,7 +909,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
                     padding: '8px 22px',
                     borderRadius: '8px',
                     border: 'none',
-                    background: 'var(--ev-teal-primary, #006968)',
+                    background: '#006968',
                     color: '#FFF',
                     fontWeight: '700',
                     cursor: 'pointer',
@@ -905,11 +925,11 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
         document.body
       )}
 
-      {/* 2. MODAL CRIAR / EDITAR / MOVER COLINHA */}
+      {/* MODAL 2: CRIAR / EDITAR / MOVER COLINHA */}
       {isMounted && modalAberto && createPortal(
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0, 30, 30, 0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
           <div style={{ background: '#FFFFFF', borderRadius: '16px', width: '100%', maxWidth: '600px', padding: '28px', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
-            <h3 style={{ margin: '0 0 16px 0', color: 'var(--ev-teal-dark, #004D4C)' }}>
+            <h3 style={{ margin: '0 0 16px 0', color: '#004D4C' }}>
               {formData.id ? '✏️ Editar / Mover Colinha' : '➕ Nova Colinha Operacional'}
             </h3>
             
@@ -926,7 +946,6 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
                 />
               </div>
 
-              {/* SELETORES DINÂMICOS DE CATEGORIA E SUBCATEGORIA */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '700', marginBottom: '4px' }}>Categoria Principal</label>
@@ -956,7 +975,12 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
                   >
                     <option value="">Nenhuma (Fica na raiz)</option>
                     {(() => {
-                      const catPai = categoriasPrincipais.find((cp) => cp.nome === formData.c);
+                      const catPai = categoriasPrincipais.find(
+                        (cp) =>
+                          normalizar(cp.nome) === normalizar(formData.c) ||
+                          normalizar(cp.nome).includes(normalizar(formData.c)) ||
+                          normalizar(formData.c).includes(normalizar(cp.nome))
+                      );
                       if (!catPai) return null;
                       return getSubcategorias(catPai.id).map((sub) => (
                         <option key={sub.id} value={sub.nome}>
@@ -993,7 +1017,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
                 <button type="button" onClick={() => setModalAberto(false)} style={{ padding: '8px 16px', borderRadius: '6px', border: 'none', background: '#F1F5F9', cursor: 'pointer', fontWeight: '600' }}>Cancelar</button>
-                <button type="submit" style={{ padding: '8px 20px', borderRadius: '6px', border: 'none', background: 'var(--ev-teal-primary, #006968)', color: '#FFF', fontWeight: '700', cursor: 'pointer' }}>
+                <button type="submit" style={{ padding: '8px 20px', borderRadius: '6px', border: 'none', background: '#006968', color: '#FFF', fontWeight: '700', cursor: 'pointer' }}>
                   {formData.id ? 'Atualizar no Banco' : 'Salvar no Banco'}
                 </button>
               </div>
@@ -1003,11 +1027,11 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
         document.body
       )}
 
-      {/* 3. MODAL DE CRIAR CATEGORIAS E SUBCATEGORIAS */}
+      {/* MODAL 3: CRIAR CATEGORIAS E SUBCATEGORIAS */}
       {isMounted && modalCategoria && createPortal(
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0, 30, 30, 0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
           <div style={{ background: '#FFFFFF', borderRadius: '16px', width: '100%', maxWidth: '480px', padding: '28px', boxShadow: '0 20px 40px rgba(0,0,0,0.25)' }}>
-            <h3 style={{ margin: '0 0 16px 0', color: 'var(--ev-teal-dark, #004D4C)' }}>
+            <h3 style={{ margin: '0 0 16px 0', color: '#004D4C' }}>
               📁 Criar Nova Categoria no Banco
             </h3>
 
@@ -1029,7 +1053,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
                       type="radio"
                       name="tipoCat"
                       checked={formCat.tipo === 'subcategoria'}
-                      onChange={() => setFormCat({ ...formCat, tipo: 'subcategoria', parentId: categoriasPrincipais[0]?.id || '' })}
+                      onChange={() => setFormCat({ ...formCat, tipo: 'subcategoria', parentId: String(categoriasPrincipais[0]?.id || '') })}
                     />
                     Subcategoria
                   </label>
@@ -1087,7 +1111,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
                 </button>
                 <button
                   type="submit"
-                  style={{ padding: '8px 20px', borderRadius: '6px', border: 'none', background: 'var(--ev-teal-primary, #006968)', color: '#FFF', fontWeight: '700', cursor: 'pointer' }}
+                  style={{ padding: '8px 20px', borderRadius: '6px', border: 'none', background: '#006968', color: '#FFF', fontWeight: '700', cursor: 'pointer' }}
                 >
                   Criar no Banco
                 </button>
@@ -1098,7 +1122,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
         document.body
       )}
 
-      {/* 4. MODAL CONFIRMAÇÃO DE EXCLUSÃO */}
+      {/* MODAL 4: CONFIRMAÇÃO DE EXCLUSÃO */}
       {isMounted && colinhaParaExcluir && createPortal(
         <div style={{
           position: 'fixed',
@@ -1184,17 +1208,17 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
         document.body
       )}
 
-      {/* 5. FEEDBACK TOAST */}
+      {/* MODAL 5: FEEDBACK TOAST */}
       {isMounted && toast.visivel && createPortal(
         <div style={{
           position: 'fixed',
           bottom: '28px',
           right: '28px',
-          background: toast.tipo === 'erro' ? '#991B1B' : 'var(--ev-teal-dark, #004D4C)',
+          background: toast.tipo === 'erro' ? '#991B1B' : '#004D4C',
           color: '#FFFFFF',
           padding: '13px 24px',
           borderRadius: '9999px',
-          border: `1.5px solid ${toast.tipo === 'erro' ? '#FCA5A5' : 'var(--ev-turquoise, #5EEAD4)'}`,
+          border: `1.5px solid ${toast.tipo === 'erro' ? '#FCA5A5' : '#5EEAD4'}`,
           zIndex: 9999,
           fontWeight: '700',
           fontSize: '0.92rem',
