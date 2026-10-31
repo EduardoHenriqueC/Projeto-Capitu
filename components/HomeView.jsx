@@ -370,10 +370,10 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
           </div>
         </div>
 
-        {/* CONTAINER DO MURAL COM OS SVGS LATERAIS */}
+        {/* CONTAINER DO MURAL COM ILUSTRAÇÕES DECORATIVAS NAS LATERAIS */}
         <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           
-          {/* ILUSTRAÇÃO LATERAL ESQUERDA (SVG) */}
+          {/* ILUSTRAÇÃO LATERAL ESQUERDA: ESTANTE & LIVROS */}
           <div className="mural-book-decor" style={{ position: 'absolute', left: '0px', top: '50%', transform: 'translateY(-50%)', width: '135px', pointerEvents: 'none', zIndex: 1 }}>
             <svg width="135" height="260" viewBox="0 0 135 260" fill="none" stroke="#8A7B68" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="12" y1="20" x2="12" y2="250" strokeWidth="2.2" />
