@@ -14,7 +14,7 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
   const [toast, setToast] = useState({ visivel: false, mensagem: '', tipo: 'sucesso' });
   const [isMounted, setIsMounted] = useState(false);
 
-  // Formulário de publicação
+  // Estado do formulário de publicação
   const [formNovo, setFormNovo] = useState({
     titulo: '',
     tagSetor: 'TI/Financeiro',
@@ -120,6 +120,8 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
     }
 
     try {
+      const autor = usuarioLogado?.nome ? `Supervisão EV (${usuarioLogado.nome})` : 'Supervisão EV';
+
       const { error } = await supabase.from('avisos_mural').insert([
         {
           titulo: formNovo.titulo,
@@ -128,7 +130,7 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
           tipo: formNovo.tipo,
           status_extra: formNovo.statusExtra,
           fixado: formNovo.fixado,
-          autor_nome: usuarioLogado?.nome || 'Supervisão EV'
+          autor_nome: autor
         }
       ]);
 
@@ -154,7 +156,7 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
 
   const handleExcluirAviso = async (e, id) => {
     e.stopPropagation();
-    if (!window.confirm('Tem certeza de que deseja remover este comunicado do mural?')) return;
+    if (!window.confirm('Tem certeza de que deseja remover este comunicado?')) return;
 
     try {
       const { error } = await supabase.from('avisos_mural').delete().eq('id', id);
@@ -464,7 +466,7 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
 
                     {/* TÍTULO AMPLIADO E CENTRALIZADO */}
                     <h3 style={{
-                      margin: '0 auto 12px auto',
+                      margin: '0 auto 14px auto',
                       fontSize: '1.38rem',
                       fontWeight: '900',
                       color: 'var(--ev-teal-dark, #004D4C)',
@@ -475,7 +477,7 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
                       {aviso.titulo}
                     </h3>
 
-                    {/* CORPO DO TEXTO AMPLIADO E CENTRALIZADO */}
+                    {/* CORPO DO TEXTO AMPLIADO E CENTRALIZADO (SEM AS TAGS DE METADADOS EMBAIXO DO TÍTULO) */}
                     <p style={{
                       margin: '0 auto',
                       fontSize: '1.02rem',
@@ -588,7 +590,7 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
               {modalAviso.descricao}
             </div>
 
-            {/* RODAPÉ DO MODAL COM A DATA DE PUBLICAÇÃO */}
+            {/* DATA DE PUBLICAÇÃO NA PARTE INFERIOR DO MODAL */}
             <div style={{
               marginTop: '18px',
               paddingTop: '16px',
