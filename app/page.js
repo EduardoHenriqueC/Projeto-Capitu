@@ -1,137 +1,188 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 
-// Telas do sistema com os caminhos atualizados
+// Telas do sistema com caminhos oficiais
 import HomeView from '../components/HomeView';
 import ColinhasBoard from '@/components/ColinhasBoard';
 import RegulamentosView from '@/components/RegulamentosView';
 import LinksView from '@/components/LinksView';
 
-// Estilização dedicada para cada papel (Admin, Supervisor e Operador)
+const LIMITE_INATIVIDADE_MS = 30 * 60 * 1000; // 30 min sem atividade => logout
+const MAX_TENTATIVAS = 5;                     // Falhas seguidas antes do bloqueio local
+const BLOQUEIO_MS = 30 * 1000;                // 30 s de espera após estourar tentativas
+const MIN_SENHA = 8;                          // Senha mínima redefinida para 8 caracteres
+
+const estiloLabel = {
+  display: 'block',
+  fontSize: '0.82rem',
+  fontWeight: '700',
+  marginBottom: '6px',
+  color: '#334155'
+};
+
+const estiloInput = {
+  width: '100%',
+  padding: '11px 14px',
+  borderRadius: '10px',
+  border: '1.5px solid #CBD5E1',
+  fontSize: '0.92rem',
+  outline: 'none',
+  backgroundColor: '#F8FAFC'
+};
+
 const obterEstiloPapel = (papel) => {
-  switch (papel) {
-    case 'admin':
-      return {
-        rotulo: '👑 Administrador',
-        corTexto: '#6D28D9',      // Roxo escuro
-        corAvatar: '#7C3AED',     // Roxo vibrante
-        fundoTag: '#F5F3FF',      // Fundo lilás suave
-        bordaTag: '#DDD6FE',      // Borda lilás
-        sombra: '0 0 12px rgba(124, 58, 237, 0.35)'
-      };
-    case 'supervisor':
-      return {
-        rotulo: '⭐ Supervisão EV',
-        corTexto: '#B45309',      // Âmbar escuro
-        corAvatar: '#D97706',     // Âmbar
-        fundoTag: '#FFFBEB',      // Fundo amarelo suave
-        bordaTag: '#FDE68A',      // Borda âmbar
-        sombra: 'none'
-      };
-    default: // operador
-      return {
-        rotulo: 'Operação EV',
-        corTexto: '#0F766E',      // Teal escuro
-        corAvatar: '#006968',     // Teal oficial EV
-        fundoTag: '#F0FDFA',      // Fundo verde água suave
-        bordaTag: '#CCFBF1',      // Borda verde água
-        sombra: 'none'
-      };
+  const p = (papel || '').toLowerCase();
+
+  if (p.includes('admin')) {
+    return {
+      rotulo: '👑 Administrador',
+      corTexto: '#6D28D9',
+      corAvatar: '#7C3AED',
+      fundoTag: '#F5F3FF',
+      bordaTag: '#DDD6FE',
+      sombra: '0 0 12px rgba(124, 58, 237, 0.35)'
+    };
   }
+
+  if (p.includes('supervis') || p.includes('lider') || p.includes('líder')) {
+    return {
+      rotulo: '⭐ Supervisão EV',
+      corTexto: '#B45309',
+      corAvatar: '#D97706',
+      fundoTag: '#FFFBEB',
+      bordaTag: '#FDE68A',
+      sombra: 'none'
+    };
+  }
+
+  return {
+    rotulo: 'Operação EV',
+    corTexto: '#0F766E',
+    corAvatar: '#006968',
+    fundoTag: '#F0FDFA',
+    bordaTag: '#CCFBF1',
+    sombra: 'none'
+  };
 };
 
 export default function Page() {
   const [view, setView] = useState('inicio');
   const [usuario, setUsuario] = useState(null);
-  const [role, setRole] = useState('operador');
   const [carregandoAuth, setCarregandoAuth] = useState(true);
 
-  // Estados dos Modais
-  const [modalLoginAberto, setModalLoginAberto] = useState(false);
-  const [modalPrimeiroAcesso, setModalPrimeiroAcesso] = useState(false);
+  // Primeiro acesso
+  const [novaSenha, setNovaSenha] = useState('');
+  const [confirmaSenha, setConfirmaSenha] = useState('');
+  const [sucessoTroca, setSucessoTroca] = useState(false);
+  const senhaJaAlterada = useRef(false);
 
   // Formulário de Login
   const [emailInput, setEmailInput] = useState('');
   const [senhaInput, setSenhaInput] = useState('');
-
-  // Formulário de Nova Senha (Primeiro Acesso)
-  const [novaSenha, setNovaSenha] = useState('');
-  const [confirmaSenha, setConfirmaSenha] = useState('');
-
   const [enviando, setEnviando] = useState(false);
   const [msgErro, setMsgErro] = useState('');
+  const falhas = useRef({ qtd: 0, ate: 0 });
 
-  // 1. CARREGA O PERFIL E CHECA SE PRECISA TROCAR A SENHA
-  const carregarPerfilUsuario = async (userAuth) => {
-    try {
-      const { data, error } = await supabase
-        .from('usuarios')
-        .select('nome, email, avatar_url, role, precisa_trocar_senha')
-        .eq('email', userAuth.email)
-        .single();
+  const role = usuario?.role || 'operador';
+  const isSupervisor = role === 'supervisor' || role === 'admin';
+  const mostrarModalPrimeiroAcesso = Boolean(usuario?.precisaTrocarSenha) || sucessoTroca;
 
-      if (data) {
-        setRole(data.role);
-        setUsuario({
-          email: data.email,
-          nome: data.nome,
-          avatar: data.avatar_url
-        });
-
-        if (data.precisa_trocar_senha) {
-          setModalPrimeiroAcesso(true);
-        } else {
-          setModalPrimeiroAcesso(false);
-        }
-      } else {
-        const nomePadrao = userAuth.email.split('@')[0].replace('.', ' ');
-        const nomeFormatado = nomePadrao.charAt(0).toUpperCase() + nomePadrao.slice(1);
-
-        setRole('operador');
-        setUsuario({
-          email: userAuth.email,
-          nome: nomeFormatado,
-          avatar: null
-        });
-      }
-    } catch (err) {
-      console.error('Erro ao ler perfil do usuário:', err);
-    } finally {
-      setCarregandoAuth(false);
+  // 1. CARREGAMENTO DO PERFIL
+  const carregarPerfil = useCallback(async (user) => {
+    if (!user) {
+      setUsuario(null);
+      return;
     }
-  };
 
-  // 2. MONITORAMENTO DE SESSÃO
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        carregarPerfilUsuario(session.user);
-      } else {
-        setUsuario(null);
-        setCarregandoAuth(false);
-      }
+    const { data, error } = await supabase
+      .from('perfis')
+      .select('id, email, nome, role, precisa_trocar_senha, ativo')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (error || !data || !data.ativo) {
+      await supabase.auth.signOut();
+      setUsuario(null);
+      setMsgErro(
+        data && !data.ativo
+          ? 'Seu acesso está desativado. Procure a equipe de TI.'
+          : 'Não foi possível validar seu acesso. Procure a equipe de TI.'
+      );
+      return;
+    }
+
+    setUsuario({
+      id: data.id,
+      email: data.email,
+      nome: data.nome,
+      role: data.role,
+      precisaTrocarSenha: Boolean(data.precisa_trocar_senha)
     });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        carregarPerfilUsuario(session.user);
-      } else {
-        setUsuario(null);
-        setRole('operador');
-        setModalPrimeiroAcesso(false);
-        setCarregandoAuth(false);
-      }
-    });
-
-    return () => subscription.unsubscribe();
   }, []);
 
-  // 3. LOGIN POR EMAIL E SENHA
+  // 2. MONITORAMENTO DE SESSÃO E LIMPEZA DE STORAGE ANTIGO
+  useEffect(() => {
+    try {
+      localStorage.removeItem('capitu_session');
+      sessionStorage.removeItem('capitu_secure_session');
+    } catch {}
+
+    let ativo = true;
+
+    supabase.auth.getSession().then(async ({ data }) => {
+      if (!ativo) return;
+      await carregarPerfil(data.session?.user ?? null);
+      if (ativo) setCarregandoAuth(false);
+    });
+
+    const { data: assinatura } = supabase.auth.onAuthStateChange((evento) => {
+      if (evento === 'SIGNED_OUT') {
+        setUsuario(null);
+        setView('inicio');
+      }
+    });
+
+    return () => {
+      ativo = false;
+      assinatura.subscription.unsubscribe();
+    };
+  }, [carregarPerfil]);
+
+  // 3. LOGOUT AUTOMÁTICO POR INATIVIDADE
+  useEffect(() => {
+    if (!usuario?.id) return;
+
+    let timer;
+    const reiniciar = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        setMsgErro('Sessão encerrada por inatividade. Entre novamente.');
+        supabase.auth.signOut();
+      }, LIMITE_INATIVIDADE_MS);
+    };
+
+    const eventos = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
+    eventos.forEach((ev) => window.addEventListener(ev, reiniciar, { passive: true }));
+    reiniciar();
+
+    return () => {
+      clearTimeout(timer);
+      eventos.forEach((ev) => window.removeEventListener(ev, reiniciar));
+    };
+  }, [usuario?.id]);
+
+  // 4. AUTENTICAÇÃO
   const handleLogin = async (e) => {
     e.preventDefault();
     setMsgErro('');
+
+    if (Date.now() < falhas.current.ate) {
+      setMsgErro('Muitas tentativas. Aguarde alguns segundos e tente novamente.');
+      return;
+    }
+
     setEnviando(true);
 
     try {
@@ -140,80 +191,250 @@ export default function Page() {
         password: senhaInput
       });
 
-      if (error) throw error;
-
-      if (data?.user) {
-        await carregarPerfilUsuario(data.user);
-        setModalLoginAberto(false);
-        setEmailInput('');
-        setSenhaInput('');
+      if (error || !data?.user) {
+        if (error?.status === 429) {
+          throw new Error('Muitas tentativas. Aguarde alguns minutos e tente novamente.');
+        }
+        falhas.current.qtd += 1;
+        if (falhas.current.qtd >= MAX_TENTATIVAS) {
+          falhas.current = { qtd: 0, ate: Date.now() + BLOQUEIO_MS };
+        }
+        throw new Error('E-mail institucional ou senha incorretos.');
       }
+
+      falhas.current = { qtd: 0, ate: 0 };
+      await carregarPerfil(data.user);
+      setEmailInput('');
+      setSenhaInput('');
     } catch (err) {
-      setMsgErro(
-        err.message === 'Invalid login credentials'
-          ? 'E-mail ou senha incorretos.'
-          : err.message
-      );
+      setSenhaInput('');
+      setMsgErro(err.message || 'Falha ao autenticar.');
     } finally {
       setEnviando(false);
     }
   };
 
-  // 4. PRIMEIRO ACESSO: ATUALIZAR SENHA CRIPTOGRAFADA
+  // 5. TROCA DE SENHA NO PRIMEIRO ACESSO (MÍNIMO 8 CARACTERES)
   const handleTrocarSenhaPrimeiroAcesso = async (e) => {
     e.preventDefault();
     setMsgErro('');
 
-    if (novaSenha.length < 6) {
-      setMsgErro('A nova senha deve ter no mínimo 6 caracteres.');
-      return;
-    }
-
-    if (novaSenha !== confirmaSenha) {
-      setMsgErro('As senhas digitadas não coincidem.');
-      return;
+    if (!senhaJaAlterada.current) {
+      if (novaSenha.length < MIN_SENHA) {
+        setMsgErro(`A nova senha deve ter no mínimo ${MIN_SENHA} caracteres.`);
+        return;
+      }
+      if (!/[A-Za-z]/.test(novaSenha) || !/\d/.test(novaSenha)) {
+        setMsgErro('A nova senha deve conter letras e números.');
+        return;
+      }
+      if (novaSenha !== confirmaSenha) {
+        setMsgErro('As senhas digitadas não coincidem.');
+        return;
+      }
     }
 
     setEnviando(true);
 
     try {
-      // Atualiza a senha no motor de autenticação (hash bcrypt)
-      const { error: erroAuth } = await supabase.auth.updateUser({
-        password: novaSenha
-      });
+      if (!senhaJaAlterada.current) {
+        const { error } = await supabase.auth.updateUser({ password: novaSenha });
 
-      if (erroAuth) throw erroAuth;
+        if (error) {
+          if (error.code === 'same_password') {
+            throw new Error('A nova senha deve ser diferente da senha temporária.');
+          }
+          if (error.code === 'weak_password') {
+            throw new Error('Senha fraca. Use letras, números e pelo menos 8 caracteres.');
+          }
+          throw new Error('Não foi possível atualizar a senha. Tente novamente.');
+        }
+        senhaJaAlterada.current = true;
+      }
 
-      // Desativa a flag de troca obrigatória
-      const { error: erroTabela } = await supabase
-        .from('usuarios')
-        .update({ precisa_trocar_senha: false })
-        .eq('email', usuario.email);
+      const { error: erroFlag } = await supabase.rpc('concluir_primeiro_acesso');
+      if (erroFlag) {
+        throw new Error('Sua senha já foi alterada, falta só concluir o acesso. Clique em salvar novamente.');
+      }
 
-      if (erroTabela) throw erroTabela;
-
-      alert('Senha cadastrada com sucesso! Bem-vindo(a) ao Portal Capitu.');
-      setModalPrimeiroAcesso(false);
+      senhaJaAlterada.current = false;
       setNovaSenha('');
       setConfirmaSenha('');
+
+      setSucessoTroca(true);
+      setUsuario((u) => (u ? { ...u, precisaTrocarSenha: false } : u));
+      setTimeout(() => setSucessoTroca(false), 1800);
     } catch (err) {
-      setMsgErro('Erro ao atualizar senha: ' + err.message);
+      setMsgErro(err.message || 'Erro ao atualizar a senha.');
     } finally {
       setEnviando(false);
     }
   };
 
-  // 5. LOGOUT
+  // 6. ENCERRAMENTO DE SESSÃO
   const handleLogout = async () => {
+    setMsgErro('');
+    setNovaSenha('');
+    setConfirmaSenha('');
+    senhaJaAlterada.current = false;
     await supabase.auth.signOut();
+    setUsuario(null);
+    setView('inicio');
   };
 
-  // Admin possui todas as permissões concedidas à Supervisão
-  const isSupervisor = role === 'supervisor' || role === 'admin';
+  if (carregandoAuth) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        backgroundColor: '#F5F3EC',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#004D4C',
+        fontSize: '1.15rem',
+        fontWeight: '800'
+      }}>
+        📖 Carregando Portal Capitu...
+      </div>
+    );
+  }
+
+  // TELA DE LOGIN OBRIGATÓRIA
+  if (!usuario) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        backgroundColor: '#F5F3EC',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '24px'
+      }}>
+        <div style={{
+          backgroundColor: '#FFFFFF',
+          borderRadius: '24px',
+          border: '1px solid #E2E8F0',
+          boxShadow: '0 20px 45px rgba(0, 77, 76, 0.08)',
+          width: '100%',
+          maxWidth: '440px',
+          padding: '44px 38px',
+          textAlign: 'center'
+        }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+            <div style={{
+              backgroundColor: '#004D4C',
+              width: '42px',
+              height: '42px',
+              borderRadius: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '1.3rem',
+              flexShrink: 0
+            }}>
+              📚
+            </div>
+            <div style={{ textAlign: 'left' }}>
+              <span style={{ fontSize: '0.64rem', fontWeight: '800', color: '#004D4C', letterSpacing: '0.8px', display: 'block' }}>
+                ESTANTE VIRTUAL
+              </span>
+              <div style={{ fontSize: '1.25rem', fontWeight: '900', lineHeight: 1.1 }}>
+                <span style={{ color: '#004D4C' }}>Portal </span>
+                <span style={{ color: '#2DD4BF' }}>Capitu</span>
+              </div>
+            </div>
+          </div>
+
+          <h2 style={{ fontSize: '1.35rem', fontWeight: '900', color: '#004D4C', margin: '14px 0 6px 0' }}>
+            Acesso Operacional
+          </h2>
+          <p style={{ fontSize: '0.86rem', color: '#64748B', margin: '0 0 26px 0', lineHeight: '1.45' }}>
+            Entre com suas credenciais corporativas para consultar colinhas, regras e links.
+          </p>
+
+          {msgErro && (
+            <div
+              role="alert"
+              style={{
+                backgroundColor: '#FEE2E2',
+                color: '#991B1B',
+                padding: '10px 14px',
+                borderRadius: '8px',
+                fontSize: '0.84rem',
+                fontWeight: '600',
+                marginBottom: '16px',
+                textAlign: 'left'
+              }}
+            >
+              ⚠️ {msgErro}
+            </div>
+          )}
+
+          <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '14px', textAlign: 'left' }}>
+            <div>
+              <label htmlFor="login-email" style={estiloLabel}>E-mail institucional:</label>
+              <input
+                id="login-email"
+                type="email"
+                required
+                autoComplete="username"
+                maxLength={254}
+                placeholder="seu_nome@estantevirtual.com.br"
+                value={emailInput}
+                onChange={(e) => setEmailInput(e.target.value)}
+                style={estiloInput}
+              />
+            </div>
+
+            <div>
+              <label htmlFor="login-senha" style={estiloLabel}>Senha de acesso:</label>
+              <input
+                id="login-senha"
+                type="password"
+                required
+                autoComplete="current-password"
+                maxLength={128}
+                placeholder="••••••••"
+                value={senhaInput}
+                onChange={(e) => setSenhaInput(e.target.value)}
+                style={estiloInput}
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={enviando}
+              style={{
+                backgroundColor: '#004D4C',
+                color: '#FFFFFF',
+                border: 'none',
+                padding: '12px',
+                borderRadius: '10px',
+                fontSize: '0.94rem',
+                fontWeight: '800',
+                cursor: enviando ? 'not-allowed' : 'pointer',
+                marginTop: '6px',
+                boxShadow: '0 4px 14px rgba(0, 77, 76, 0.25)',
+                opacity: enviando ? 0.7 : 1
+              }}
+            >
+              {enviando ? 'Validando acesso...' : 'Entrar no Portal'}
+            </button>
+          </form>
+
+          <div style={{ marginTop: '28px', paddingTop: '18px', borderTop: '1px solid #F1F5F9' }}>
+            <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748B', lineHeight: '1.5' }}>
+              Novo operador ou esqueceu a senha? Solicite o cadastro ou reset de acesso junto à <strong>equipe de TI</strong>.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#F8FAFC' }}>
-      
+
       {/* NAVBAR SUPERIOR */}
       <header style={{
         backgroundColor: '#FFFFFF',
@@ -226,47 +447,46 @@ export default function Page() {
         top: 0,
         zIndex: 100
       }}>
- {/* LOGO COM EMBLEMA E IDENTIDADE ESTANTE VIRTUAL */}
-<div
-  onClick={() => setView('inicio')}
-  style={{
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-    cursor: 'pointer',
-    userSelect: 'none'
-  }}
->
-  <div style={{
-    backgroundColor: '#004D4C',
-    width: '42px',
-    height: '42px',
-    borderRadius: '12px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: '1.3rem',
-    flexShrink: 0
-  }}>
-    📚
-  </div>
+        <div
+          onClick={() => setView('inicio')}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            cursor: 'pointer',
+            userSelect: 'none'
+          }}
+        >
+          <div style={{
+            backgroundColor: '#004D4C',
+            width: '42px',
+            height: '42px',
+            borderRadius: '12px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '1.3rem',
+            flexShrink: 0
+          }}>
+            📚
+          </div>
 
-  <div style={{ display: 'flex', flexDirection: 'column' }}>
-    <span style={{
-      fontSize: '0.64rem',
-      fontWeight: '800',
-      color: '#004D4C',
-      letterSpacing: '0.8px',
-      textTransform: 'uppercase'
-    }}>
-      ESTANTE VIRTUAL
-    </span>
-    <div style={{ fontSize: '1.25rem', fontWeight: '900', lineHeight: 1.1 }}>
-      <span style={{ color: '#004D4C' }}>Portal </span>
-      <span style={{ color: '#2DD4BF' }}>Capitu</span>
-    </div>
-  </div>
-</div>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <span style={{
+              fontSize: '0.64rem',
+              fontWeight: '800',
+              color: '#004D4C',
+              letterSpacing: '0.8px',
+              textTransform: 'uppercase'
+            }}>
+              ESTANTE VIRTUAL
+            </span>
+            <div style={{ fontSize: '1.25rem', fontWeight: '900', lineHeight: 1.1 }}>
+              <span style={{ color: '#004D4C' }}>Portal </span>
+              <span style={{ color: '#2DD4BF' }}>Capitu</span>
+            </div>
+          </div>
+        </div>
 
         {/* NAVEGAÇÃO ENTRE AS PÁGINAS */}
         <nav style={{ display: 'flex', gap: '8px' }}>
@@ -280,7 +500,7 @@ export default function Page() {
               key={item.id}
               onClick={() => setView(item.id)}
               style={{
-                backgroundColor: view === item.id ? 'var(--ev-teal-primary)' : 'transparent',
+                backgroundColor: view === item.id ? '#006968' : 'transparent',
                 color: view === item.id ? '#FFFFFF' : '#475569',
                 border: 'none',
                 padding: '8px 18px',
@@ -288,314 +508,135 @@ export default function Page() {
                 fontWeight: '700',
                 fontSize: '0.86rem',
                 cursor: 'pointer',
-                transition: 'all 0.2s'
+                transition: 'all 0.2s',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
               }}
             >
-              {item.icone} {item.label}
+              <span>{item.icone}</span> {item.label}
             </button>
           ))}
         </nav>
 
-        {/* ÁREA DE PERFIL / LOGIN */}
+        {/* ÁREA DE PERFIL */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-          {carregandoAuth ? (
-            <span style={{ fontSize: '0.8rem', color: '#94A3B8' }}>Validando sessão...</span>
-          ) : usuario ? (
-            (() => {
-              const estilo = obterEstiloPapel(role);
-              return (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  
-                  {/* AVATAR COM A COR E SOMBRA DO CARGO */}
-                  <div style={{
-                    width: '40px',
-                    height: '40px',
-                    borderRadius: '50%',
-                    backgroundColor: estilo.corAvatar,
-                    color: '#FFFFFF',
-                    fontWeight: '800',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '0.9rem',
-                    boxShadow: estilo.sombra
-                  }}>
-                    {usuario.nome ? usuario.nome.slice(0, 2).toUpperCase() : 'EV'}
-                  </div>
-
-                  {/* NOME E TAG DO CARGO */}
-                  <div style={{ textAlign: 'left', lineHeight: '1.2' }}>
-                    <div style={{ fontSize: '0.9rem', fontWeight: '800', color: 'var(--text-dark)' }}>
-                      {usuario.nome}
-                    </div>
-                    
-                    <span style={{
-                      display: 'inline-block',
-                      marginTop: '3px',
-                      fontSize: '0.72rem',
-                      fontWeight: '800',
-                      color: estilo.corTexto,
-                      backgroundColor: estilo.fundoTag,
-                      border: `1px solid ${estilo.bordaTag}`,
-                      padding: '2px 8px',
-                      borderRadius: '9999px',
-                      letterSpacing: '0.3px'
-                    }}>
-                      {estilo.rotulo}
-                    </span>
-                  </div>
-
-                  {/* BOTÃO SAIR */}
-                  <button
-                    onClick={handleLogout}
-                    title="Sair do portal"
-                    style={{
-                      background: '#F1F5F9',
-                      border: 'none',
-                      padding: '6px 12px',
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                      fontSize: '0.8rem',
-                      color: '#64748B',
-                      fontWeight: '700',
-                      marginLeft: '6px'
-                    }}
-                  >
-                    Sair
-                  </button>
+          {(() => {
+            const estilo = obterEstiloPapel(role);
+            return (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '50%',
+                  backgroundColor: estilo.corAvatar,
+                  color: '#FFFFFF',
+                  fontWeight: '800',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '0.9rem',
+                  boxShadow: estilo.sombra
+                }}>
+                  {usuario.nome ? usuario.nome.slice(0, 2).toUpperCase() : 'EV'}
                 </div>
-              );
-            })()
-          ) : (
-            <button
-              onClick={() => {
-                setModalLoginAberto(true);
-                setMsgErro('');
-              }}
-              style={{
-                backgroundColor: 'var(--ev-teal-primary)',
-                color: '#FFFFFF',
-                border: 'none',
-                padding: '8px 20px',
-                borderRadius: '9999px',
-                fontSize: '0.86rem',
-                fontWeight: '700',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                boxShadow: '0 2px 8px rgba(0, 105, 104, 0.25)'
-              }}
-            >
-              <span>👤</span> Entrar no Portal
-            </button>
-          )}
+
+                <div style={{ textAlign: 'left', lineHeight: '1.2' }}>
+                  <div style={{ fontSize: '0.9rem', fontWeight: '800', color: '#1E293B' }}>
+                    {usuario.nome}
+                  </div>
+
+                  <span style={{
+                    display: 'inline-block',
+                    marginTop: '3px',
+                    fontSize: '0.72rem',
+                    fontWeight: '800',
+                    color: estilo.corTexto,
+                    backgroundColor: estilo.fundoTag,
+                    border: `1px solid ${estilo.bordaTag}`,
+                    padding: '2px 8px',
+                    borderRadius: '9999px',
+                    letterSpacing: '0.3px'
+                  }}>
+                    {estilo.rotulo}
+                  </span>
+                </div>
+
+                <button
+                  onClick={handleLogout}
+                  title="Sair do portal"
+                  style={{
+                    background: '#F1F5F9',
+                    border: 'none',
+                    padding: '6px 12px',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '0.8rem',
+                    color: '#64748B',
+                    fontWeight: '700',
+                    marginLeft: '6px',
+                    transition: 'all 0.15s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#FEE2E2';
+                    e.currentTarget.style.color = '#DC2626';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = '#F1F5F9';
+                    e.currentTarget.style.color = '#64748B';
+                  }}
+                >
+                  Sair
+                </button>
+              </div>
+            );
+          })()}
         </div>
       </header>
 
-      {/* RENDERIZAÇÃO DAS TELAS DO SISTEMA */}
-{/* CSS DA TRANSIÇÃO SUAVE (FADE IN + SLIDE UP) */}
-<style jsx global>{`
-        @keyframes surgirTela {
-          from {
-            opacity: 0;
-            transform: translateY(8px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        .animacao-troca-tela {
-          animation: surgirTela 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-        }
-      `}</style>
+      {/* TELAS: Carregadas apenas com o primeiro acesso concluído */}
+      {!usuario.precisaTrocarSenha && (
+        <main key={view} style={{ minHeight: 'calc(100vh - 72px)' }}>
+          {view === 'inicio' && (
+            <HomeView
+              setView={setView}
+              isSupervisor={isSupervisor}
+              usuarioLogado={usuario}
+            />
+          )}
 
-      {/* RENDERIZAÇÃO DAS TELAS COM TRANSIÇÃO SUAVE */}
-      <main key={view} className="animacao-troca-tela">
-        {view === 'inicio' && (
-          <HomeView
-            setView={setView}
-            isSupervisor={isSupervisor}
-            usuarioLogado={usuario}
-          />
-        )}
+          {view === 'colinhas' && (
+            <ColinhasBoard
+              setView={setView}
+              isSupervisor={isSupervisor}
+              usuarioLogado={usuario}
+            />
+          )}
 
-        {view === 'colinhas' && (
-          <ColinhasBoard
-            setView={setView}
-            isSupervisor={isSupervisor}
-            usuarioLogado={usuario}
-          />
-        )}
+          {view === 'regulamentos' && (
+            <RegulamentosView
+              setView={setView}
+              isSupervisor={isSupervisor}
+              usuarioLogado={usuario}
+            />
+          )}
 
-        {view === 'regulamentos' && (
-          <RegulamentosView
-            setView={setView}
-            isSupervisor={isSupervisor}
-            usuarioLogado={usuario}
-          />
-        )}
-
-        {view === 'links' && (
-          <LinksView
-            setView={setView}
-            isSupervisor={isSupervisor}
-            usuarioLogado={usuario}
-          />
-        )}
-      </main>
-
-      {/* MODAL DE LOGIN (USUÁRIO E SENHA) */}
-      {modalLoginAberto && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 30, 30, 0.65)',
-            backdropFilter: 'blur(5px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 2000,
-            padding: '20px'
-          }}
-          onClick={() => setModalLoginAberto(false)}
-        >
-          <div
-            style={{
-              backgroundColor: '#FFFFFF',
-              borderRadius: '20px',
-              padding: '32px 36px',
-              width: '100%',
-              maxWidth: '420px',
-              boxShadow: '0 25px 50px rgba(0, 30, 30, 0.25)',
-              position: 'relative'
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              onClick={() => setModalLoginAberto(false)}
-              style={{
-                position: 'absolute',
-                top: '20px',
-                right: '20px',
-                background: '#F1F5F9',
-                border: 'none',
-                width: '32px',
-                height: '32px',
-                borderRadius: '50%',
-                cursor: 'pointer',
-                color: '#64748B',
-                fontWeight: '800'
-              }}
-            >
-              ✕
-            </button>
-
-            <div style={{ textAlign: 'center', marginBottom: '22px' }}>
-              <div style={{ fontSize: '2.4rem', marginBottom: '6px' }}>🔑</div>
-              <h3 style={{ margin: 0, fontSize: '1.4rem', fontWeight: '800', color: 'var(--ev-teal-dark)' }}>
-                Acesso Operacional
-              </h3>
-              <p style={{ margin: '6px 0 0 0', fontSize: '0.85rem', color: '#64748B' }}>
-                Entre com seu e-mail e senha corporativos.
-              </p>
-            </div>
-
-            {msgErro && (
-              <div style={{
-                backgroundColor: '#FEE2E2',
-                color: '#991B1B',
-                padding: '10px 14px',
-                borderRadius: '8px',
-                fontSize: '0.82rem',
-                fontWeight: '600',
-                marginBottom: '16px',
-                textAlign: 'center'
-              }}>
-                {msgErro}
-              </div>
-            )}
-
-            <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', marginBottom: '6px', color: '#334155' }}>
-                  E-mail institucional:
-                </label>
-                <input
-                  type="email"
-                  required
-                  placeholder="seu_nome@magazineluiza.com.br"
-                  value={emailInput}
-                  onChange={(e) => setEmailInput(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '10px 14px',
-                    borderRadius: '8px',
-                    border: '1.5px solid #CBD5E1',
-                    fontSize: '0.92rem',
-                    outline: 'none'
-                  }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', marginBottom: '6px', color: '#334155' }}>
-                  Senha:
-                </label>
-                <input
-                  type="password"
-                  required
-                  placeholder="••••••••"
-                  value={senhaInput}
-                  onChange={(e) => setSenhaInput(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '10px 14px',
-                    borderRadius: '8px',
-                    border: '1.5px solid #CBD5E1',
-                    fontSize: '0.92rem',
-                    outline: 'none'
-                  }}
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={enviando}
-                style={{
-                  backgroundColor: 'var(--ev-teal-primary)',
-                  color: '#FFFFFF',
-                  border: 'none',
-                  padding: '12px',
-                  borderRadius: '8px',
-                  fontSize: '0.95rem',
-                  fontWeight: '800',
-                  cursor: enviando ? 'not-allowed' : 'pointer',
-                  marginTop: '8px',
-                  opacity: enviando ? 0.7 : 1
-                }}
-              >
-                {enviando ? 'Entrando...' : 'Entrar no Portal'}
-              </button>
-            </form>
-          </div>
-        </div>
+          {view === 'links' && (
+            <LinksView
+              setView={setView}
+              isSupervisor={isSupervisor}
+              usuarioLogado={usuario}
+            />
+          )}
+        </main>
       )}
 
-      {/* MODAL DE PRIMEIRO ACESSO (TROCA OBRIGATÓRIA DE SENHA) */}
-      {modalPrimeiroAcesso && (
+      {/* MODAL DE PRIMEIRO ACESSO */}
+      {mostrarModalPrimeiroAcesso && (
         <div
           style={{
             position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
+            inset: 0,
             backgroundColor: 'rgba(0, 20, 20, 0.85)',
             backdropFilter: 'blur(8px)',
             display: 'flex',
@@ -616,94 +657,132 @@ export default function Page() {
               position: 'relative'
             }}
           >
-            <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-              <div style={{ fontSize: '2.6rem', marginBottom: '8px' }}>🛡️</div>
-              <h3 style={{ margin: 0, fontSize: '1.45rem', fontWeight: '800', color: 'var(--ev-teal-dark)' }}>
-                Primeiro Acesso: Nova Senha
-              </h3>
-              <p style={{ margin: '8px 0 0 0', fontSize: '0.86rem', color: '#64748B', lineHeight: '1.5' }}>
-                Você está utilizando uma senha temporária. Por segurança, defina sua senha definitiva para continuar.
-              </p>
-            </div>
-
-            {msgErro && (
-              <div style={{
-                backgroundColor: '#FEE2E2',
-                color: '#991B1B',
-                padding: '10px 14px',
-                borderRadius: '8px',
-                fontSize: '0.82rem',
-                fontWeight: '600',
-                marginBottom: '16px',
-                textAlign: 'center'
-              }}>
-                {msgErro}
+            {sucessoTroca ? (
+              <div style={{ textAlign: 'center', padding: '24px 10px' }}>
+                <div style={{
+                  width: '64px',
+                  height: '64px',
+                  borderRadius: '50%',
+                  backgroundColor: '#DCFCE7',
+                  color: '#15803D',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '2rem',
+                  margin: '0 auto 16px auto'
+                }}>
+                  ✓
+                </div>
+                <h3 style={{ margin: '0 0 8px 0', fontSize: '1.35rem', fontWeight: '900', color: '#004D4C' }}>
+                  Senha cadastrada com sucesso!
+                </h3>
+                <p style={{ margin: 0, fontSize: '0.9rem', color: '#64748B' }}>
+                  Bem-vindo(a) ao Portal Capitu. Acessando o painel...
+                </p>
               </div>
+            ) : (
+              <>
+                <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+                  <div style={{ fontSize: '2.6rem', marginBottom: '8px' }}>🛡️</div>
+                  <h3 style={{ margin: 0, fontSize: '1.45rem', fontWeight: '800', color: '#004D4C' }}>
+                    Primeiro Acesso: Nova Senha
+                  </h3>
+                  <p style={{ margin: '8px 0 0 0', fontSize: '0.86rem', color: '#64748B', lineHeight: '1.5' }}>
+                    Você está utilizando uma senha temporária. Defina sua nova senha de acesso para prosseguir.
+                  </p>
+                </div>
+
+                {msgErro && (
+                  <div
+                    role="alert"
+                    style={{
+                      backgroundColor: '#FEE2E2',
+                      color: '#991B1B',
+                      padding: '10px 14px',
+                      borderRadius: '8px',
+                      fontSize: '0.82rem',
+                      fontWeight: '600',
+                      marginBottom: '16px',
+                      textAlign: 'center'
+                    }}
+                  >
+                    {msgErro}
+                  </div>
+                )}
+
+                <form onSubmit={handleTrocarSenhaPrimeiroAcesso} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  <div>
+                    <label htmlFor="nova-senha" style={estiloLabel}>
+                      Nova senha (mínimo {MIN_SENHA} caracteres, com letras e números):
+                    </label>
+                    <input
+                      id="nova-senha"
+                      type="password"
+                      required
+                      autoComplete="new-password"
+                      maxLength={128}
+                      placeholder="Digite sua nova senha"
+                      value={novaSenha}
+                      onChange={(e) => setNovaSenha(e.target.value)}
+                      disabled={senhaJaAlterada.current}
+                      style={estiloInput}
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="confirma-senha" style={estiloLabel}>Confirme a nova senha:</label>
+                    <input
+                      id="confirma-senha"
+                      type="password"
+                      required
+                      autoComplete="new-password"
+                      maxLength={128}
+                      placeholder="Repita a nova senha"
+                      value={confirmaSenha}
+                      onChange={(e) => setConfirmaSenha(e.target.value)}
+                      disabled={senhaJaAlterada.current}
+                      style={estiloInput}
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={enviando}
+                    style={{
+                      backgroundColor: '#006968',
+                      color: '#FFFFFF',
+                      border: 'none',
+                      padding: '13px',
+                      borderRadius: '8px',
+                      fontSize: '0.95rem',
+                      fontWeight: '800',
+                      cursor: enviando ? 'not-allowed' : 'pointer',
+                      marginTop: '10px',
+                      boxShadow: '0 4px 12px rgba(0, 105, 104, 0.25)',
+                      opacity: enviando ? 0.7 : 1
+                    }}
+                  >
+                    {enviando ? 'Salvando credencial...' : 'Salvar Senha e Entrar'}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    style={{
+                      backgroundColor: 'transparent',
+                      border: 'none',
+                      color: '#64748B',
+                      fontSize: '0.82rem',
+                      fontWeight: '700',
+                      cursor: 'pointer',
+                      padding: '6px'
+                    }}
+                  >
+                    Sair
+                  </button>
+                </form>
+              </>
             )}
-
-            <form onSubmit={handleTrocarSenhaPrimeiroAcesso} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', marginBottom: '6px', color: '#334155' }}>
-                  Nova senha (mínimo 6 caracteres):
-                </label>
-                <input
-                  type="password"
-                  required
-                  placeholder="Digite sua nova senha"
-                  value={novaSenha}
-                  onChange={(e) => setNovaSenha(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '11px 14px',
-                    borderRadius: '8px',
-                    border: '1.5px solid #CBD5E1',
-                    fontSize: '0.92rem',
-                    outline: 'none'
-                  }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', marginBottom: '6px', color: '#334155' }}>
-                  Confirme a nova senha:
-                </label>
-                <input
-                  type="password"
-                  required
-                  placeholder="Repita a nova senha"
-                  value={confirmaSenha}
-                  onChange={(e) => setConfirmaSenha(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '11px 14px',
-                    borderRadius: '8px',
-                    border: '1.5px solid #CBD5E1',
-                    fontSize: '0.92rem',
-                    outline: 'none'
-                  }}
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={enviando}
-                style={{
-                  backgroundColor: 'var(--ev-teal-primary)',
-                  color: '#FFFFFF',
-                  border: 'none',
-                  padding: '13px',
-                  borderRadius: '8px',
-                  fontSize: '0.95rem',
-                  fontWeight: '800',
-                  cursor: enviando ? 'not-allowed' : 'pointer',
-                  marginTop: '10px',
-                  boxShadow: '0 4px 12px rgba(0, 105, 104, 0.25)',
-                  opacity: enviando ? 0.7 : 1
-                }}
-              >
-                {enviando ? 'Criptografando e salvando...' : 'Salvar Nova Senha e Acessar'}
-              </button>
-            </form>
           </div>
         </div>
       )}
