@@ -381,7 +381,7 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
           </div>
         </div>
 
-        {/* CONTAINER DO MURAL COM ILUSTRAÇÕES DECORATIVAS */}
+        {/* CONTAINER DO MURAL COM ILUSTRAÇÕES DECORATIVAS (COM ALTURA MÍNIMA PARA NÃO SUBIR) */}
         <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '320px' }}>
           
           <div className="mural-book-decor" style={{ position: 'absolute', left: '0px', top: '50%', transform: 'translateY(-50%)', width: '135px', pointerEvents: 'none', zIndex: 1 }}>
@@ -653,7 +653,7 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
         document.body
       )}
 
-      {/* MODAL PUBLICAR AVISO */}
+      {/* MODAL PUBLICAR AVISO (CORRIGIDO: COM document.body) */}
       {isMounted && modalPublicar && createPortal(
         <div
           style={{
@@ -778,7 +778,8 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* FEEDBACK TOAST */}
