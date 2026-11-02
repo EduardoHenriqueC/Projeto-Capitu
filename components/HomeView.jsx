@@ -4,14 +4,18 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
 
+const EMOJIS_PADRAO = ['👍', '❤️', '👏', '😂', '🎉', '💡'];
+
 export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
   const [filtroAvisos, setFiltroAvisos] = useState('todos');
   const [modalAviso, setModalAviso] = useState(null);
   const [modalPublicar, setModalPublicar] = useState(false);
+  const [avisoEmEdicao, setAvisoEmEdicao] = useState(null);
   const [carregando, setCarregando] = useState(true);
   const [avisos, setAvisos] = useState([]);
   const [toast, setToast] = useState({ visivel: false, mensagem: '', tipo: 'sucesso' });
   const [isMounted, setIsMounted] = useState(false);
+  const [pickerAbertoId, setPickerAbertoId] = useState(null);
 
   const [formNovo, setFormNovo] = useState({
     titulo: '',
@@ -27,23 +31,71 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
     setTimeout(() => setToast({ visivel: false, mensagem: '', tipo: 'sucesso' }), 2800);
   };
 
+  // FECHAMENTO INTELIGENTE: Só fecha ao clicar genuinamente fora da área de reações
   useEffect(() => {
     setIsMounted(true);
+
+    const handleClickFora = (e) => {
+      if (e.target.closest && e.target.closest('.mural-reacoes-container')) {
+        return; // Não fecha se o clique foi no botão ou num emoji
+      }
+      setPickerAbertoId(null);
+    };
+
+    document.addEventListener('mousedown', handleClickFora);
+    return () => document.removeEventListener('mousedown', handleClickFora);
   }, []);
 
+  const agruparReacoes = (reacoesLista = [], usuario = null) => {
+    const mapa = {};
+    reacoesLista.forEach((r) => {
+      if (!mapa[r.emoji]) {
+        mapa[r.emoji] = [];
+      }
+      if (!mapa[r.emoji].includes(r.user_nome)) {
+        mapa[r.emoji].push(r.user_nome || 'Operador');
+      }
+    });
+
+    return Object.entries(mapa).map(([emoji, nomes]) => {
+      const jaReagiu = reacoesLista.some(
+        (r) => r.emoji === emoji && (r.user_id === usuario?.id || r.user_nome === usuario?.nome)
+      );
+      return {
+        emoji,
+        total: nomes.length,
+        nomes: nomes,
+        jaReagiu
+      };
+    });
+  };
+
+  // BUSCA DE AVISOS E REAÇÕES NO BANCO
   const buscarAvisos = async () => {
     try {
       setCarregando(true);
-      const { data, error } = await supabase
+      const { data: avisosData, error: errAvisos } = await supabase
         .from('avisos_mural')
         .select('*')
         .order('fixado', { ascending: false })
         .order('id', { ascending: false });
 
-      if (error) throw error;
+      if (errAvisos) throw errAvisos;
 
-      if (data) {
-        const formatados = data.map((item) => {
+      let reacoesData = [];
+      try {
+        const { data: rData, error: errReacoes } = await supabase
+          .from('reacoes_mural')
+          .select('*');
+        if (!errReacoes && rData) {
+          reacoesData = rData;
+        }
+      } catch (errR) {
+        console.warn('Tabela reacoes_mural ainda não criada:', errR);
+      }
+
+      if (avisosData) {
+        const formatados = avisosData.map((item) => {
           const dataCriacao = item.criado_em || item.created_at || new Date().toISOString();
           const hora = new Date(dataCriacao).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
@@ -67,11 +119,14 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
             badges.push({ rotulo: '📌 FIXADO', bg: 'rgba(148, 163, 184, 0.2)', cor: '#CBD5E1' });
           }
 
+          const reacoesDoAviso = reacoesData.filter((r) => String(r.aviso_id) === String(item.id));
+
           return {
             id: item.id,
             tipo: item.tipo,
             fixado: item.fixado,
             tagSetor: item.tag_setor,
+            statusExtra: item.status_extra || 'Nenhum',
             corRibbon: item.tipo === 'urgente' ? '#EF4444' : '#0D9488',
             corRibbonSombra: 'rgba(0, 0, 0, 0.4)',
             tagBg: 'rgba(45, 212, 191, 0.15)',
@@ -80,7 +135,9 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
             titulo: item.titulo,
             meta: `Publicado às ${hora} • ${item.autor_nome || 'Supervisão EV'} • ${item.tag_setor}`,
             descricao: item.descricao,
-            borda: item.tipo === 'urgente' ? '#DC2626' : '#0D9488'
+            borda: item.tipo === 'urgente' ? '#DC2626' : '#0D9488',
+            reacoesBrutas: reacoesDoAviso,
+            reacoesAgrupadas: agruparReacoes(reacoesDoAviso, usuarioLogado)
           };
         });
         setAvisos(formatados);
@@ -96,8 +153,11 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
     buscarAvisos();
 
     const canal = supabase
-      .channel('avisos_realtime')
+      .channel('avisos_e_reacoes_realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'avisos_mural' }, () => {
+        buscarAvisos();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'reacoes_mural' }, () => {
         buscarAvisos();
       })
       .subscribe();
@@ -107,6 +167,107 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
     };
   }, []);
 
+  // REAÇÃO / DES-REAÇÃO INSTANTÂNEA
+  const handleToggleReacao = async (avisoId, emoji) => {
+    if (!usuarioLogado?.id) {
+      dispararToast('Você precisa estar autenticado para reagir.', 'erro');
+      return;
+    }
+
+    const aviso = avisos.find((a) => a.id === avisoId);
+    const reacaoExistente = aviso?.reacoesBrutas?.find(
+      (r) =>
+        String(r.aviso_id) === String(avisoId) &&
+        (r.user_id === usuarioLogado.id || r.user_nome === usuarioLogado.nome) &&
+        r.emoji === emoji
+    );
+
+    // Atualização otimista na tela (0 ms)
+    setAvisos((prevAvisos) =>
+      prevAvisos.map((a) => {
+        if (a.id !== avisoId) return a;
+        let novasReacoesBrutas;
+        if (reacaoExistente) {
+          novasReacoesBrutas = a.reacoesBrutas.filter((r) => r.id !== reacaoExistente.id);
+        } else {
+          novasReacoesBrutas = [
+            ...a.reacoesBrutas,
+            {
+              id: 'temp-' + Date.now(),
+              aviso_id: avisoId,
+              user_id: usuarioLogado.id,
+              user_nome: usuarioLogado.nome || 'Operador',
+              emoji: emoji
+            }
+          ];
+        }
+        return {
+          ...a,
+          reacoesBrutas: novasReacoesBrutas,
+          reacoesAgrupadas: agruparReacoes(novasReacoesBrutas, usuarioLogado)
+        };
+      })
+    );
+
+    try {
+      if (reacaoExistente) {
+        const { error } = await supabase
+          .from('reacoes_mural')
+          .delete()
+          .eq('aviso_id', avisoId)
+          .eq('emoji', emoji)
+          .eq('user_id', usuarioLogado.id);
+
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('reacoes_mural')
+          .insert([
+            {
+              aviso_id: avisoId,
+              user_id: usuarioLogado.id,
+              user_nome: usuarioLogado.nome || 'Operador',
+              emoji: emoji
+            }
+          ]);
+
+        if (error) throw error;
+      }
+    } catch (err) {
+      console.error('Erro ao atualizar reação:', err);
+      dispararToast('Erro ao registrar reação: ' + err.message, 'erro');
+      await buscarAvisos();
+    }
+  };
+
+  // ABERTURA DE MODAL (CRIAR E EDITAR)
+  const handleAbrirCriar = () => {
+    setAvisoEmEdicao(null);
+    setFormNovo({
+      titulo: '',
+      tagSetor: 'TI/Financeiro',
+      tipo: 'urgente',
+      statusExtra: '✓ SOLUCIONADO',
+      fixado: false,
+      descricao: ''
+    });
+    setModalPublicar(true);
+  };
+
+  const handleAbrirEditarAviso = (e, aviso) => {
+    if (e) e.stopPropagation();
+    setAvisoEmEdicao(aviso.id);
+    setFormNovo({
+      titulo: aviso.titulo,
+      tagSetor: aviso.tagSetor,
+      tipo: aviso.tipo,
+      statusExtra: aviso.statusExtra || 'Nenhum',
+      fixado: Boolean(aviso.fixado),
+      descricao: aviso.descricao
+    });
+    setModalPublicar(true);
+  };
+
   const handleSalvarAviso = async (e) => {
     e.preventDefault();
     if (!formNovo.titulo.trim() || !formNovo.descricao.trim()) {
@@ -115,24 +276,42 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
     }
 
     try {
-      const autor = usuarioLogado?.nome ? `Supervisão EV (${usuarioLogado.nome})` : 'Supervisão EV';
+      if (avisoEmEdicao) {
+        const { error } = await supabase
+          .from('avisos_mural')
+          .update({
+            titulo: formNovo.titulo.trim(),
+            descricao: formNovo.descricao.trim(),
+            tag_setor: formNovo.tagSetor.trim(),
+            tipo: formNovo.tipo,
+            status_extra: formNovo.statusExtra,
+            fixado: formNovo.fixado
+          })
+          .eq('id', avisoEmEdicao);
 
-      const { error } = await supabase.from('avisos_mural').insert([
-        {
-          titulo: formNovo.titulo,
-          descricao: formNovo.descricao,
-          tag_setor: formNovo.tagSetor,
-          tipo: formNovo.tipo,
-          status_extra: formNovo.statusExtra,
-          fixado: formNovo.fixado,
-          autor_nome: autor
-        }
-      ]);
+        if (error) throw error;
+        dispararToast('✅ Comunicado atualizado com sucesso!', 'sucesso');
+      } else {
+        const autor = usuarioLogado?.nome ? `Supervisão EV (${usuarioLogado.nome})` : 'Supervisão EV';
+        const { error } = await supabase.from('avisos_mural').insert([
+          {
+            titulo: formNovo.titulo.trim(),
+            descricao: formNovo.descricao.trim(),
+            tag_setor: formNovo.tagSetor.trim(),
+            tipo: formNovo.tipo,
+            status_extra: formNovo.statusExtra,
+            fixado: formNovo.fixado,
+            autor_nome: autor
+          }
+        ]);
 
-      if (error) throw error;
+        if (error) throw error;
+        dispararToast('📢 Comunicado publicado no mural!', 'sucesso');
+      }
 
       await buscarAvisos();
       setModalPublicar(false);
+      setAvisoEmEdicao(null);
       setFormNovo({
         titulo: '',
         tagSetor: 'TI/Financeiro',
@@ -141,8 +320,6 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
         fixado: false,
         descricao: ''
       });
-
-      dispararToast('📢 Comunicado publicado no mural!', 'sucesso');
     } catch (err) {
       console.error('Erro ao salvar no banco:', err);
       dispararToast('Erro ao salvar no banco: ' + err.message, 'erro');
@@ -235,6 +412,11 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
         .mural-card-item:hover {
           transform: translateY(-3px);
           box-shadow: 0 14px 32px rgba(0, 0, 0, 0.14);
+        }
+
+        .btn-emoji-opcao:hover {
+          transform: scale(1.25);
+          background-color: var(--bg-item-aberto, #F1F5F9);
         }
 
         [data-theme="dark"] .mural-book-decor svg line,
@@ -346,7 +528,7 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
             <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
               {isSupervisor && (
                 <button
-                  onClick={() => setModalPublicar(true)}
+                  onClick={handleAbrirCriar}
                   style={{
                     backgroundColor: '#006968',
                     color: '#FFFFFF',
@@ -381,7 +563,7 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
           </div>
         </div>
 
-        {/* CONTAINER DO MURAL COM ILUSTRAÇÕES DECORATIVAS (COM ALTURA MÍNIMA PARA NÃO SUBIR) */}
+        {/* CONTAINER DO MURAL COM ILUSTRAÇÕES DECORATIVAS E ALTURA MÍNIMA */}
         <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '320px' }}>
           
           <div className="mural-book-decor" style={{ position: 'absolute', left: '0px', top: '50%', transform: 'translateY(-50%)', width: '135px', pointerEvents: 'none', zIndex: 1 }}>
@@ -445,6 +627,7 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
                   }} />
 
                   <div>
+                    {/* CABEÇALHO DO CARD COM BADGES E AÇÕES DE SUPERVISOR */}
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', flexWrap: 'wrap', marginBottom: '14px', paddingRight: '36px' }}>
                       {aviso.badgeStatus.map((b, idx) => (
                         <span key={idx} style={{ backgroundColor: b.bg, color: b.cor, fontSize: '0.7rem', fontWeight: '800', padding: '3px 8px', borderRadius: '6px' }}>
@@ -457,27 +640,48 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
                       </span>
 
                       {isSupervisor && (
-                        <button
-                          onClick={(e) => handleExcluirAviso(e, aviso.id)}
-                          title="Remover comunicado"
-                          style={{
-                            background: 'rgba(239, 68, 68, 0.15)',
-                            color: '#F87171',
-                            border: 'none',
-                            width: '22px',
-                            height: '22px',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            fontWeight: '800',
-                            fontSize: '0.75rem',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            marginLeft: '4px'
-                          }}
-                        >
-                          ✕
-                        </button>
+                        <div style={{ display: 'flex', gap: '4px', alignItems: 'center', marginLeft: '4px' }} onClick={(e) => e.stopPropagation()}>
+                          <button
+                            onClick={(e) => handleAbrirEditarAviso(e, aviso)}
+                            title="Editar comunicado"
+                            style={{
+                              background: 'rgba(45, 212, 191, 0.15)',
+                              color: '#2DD4BF',
+                              border: 'none',
+                              width: '24px',
+                              height: '24px',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              fontWeight: '800',
+                              fontSize: '0.74rem',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
+                            }}
+                          >
+                            ✏️
+                          </button>
+                          <button
+                            onClick={(e) => handleExcluirAviso(e, aviso.id)}
+                            title="Remover comunicado"
+                            style={{
+                              background: 'rgba(239, 68, 68, 0.15)',
+                              color: '#F87171',
+                              border: 'none',
+                              width: '24px',
+                              height: '24px',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              fontWeight: '800',
+                              fontSize: '0.75rem',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
+                            }}
+                          >
+                            ✕
+                          </button>
+                        </div>
                       )}
                     </div>
 
@@ -488,7 +692,136 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
                       {aviso.descricao}
                     </p>
                   </div>
-                  <div style={{ marginTop: '22px', paddingTop: '12px', borderTop: '1px dotted var(--border-card)', textAlign: 'center' }}>
+
+                  {/* BARRA DE REAÇÕES SOCIAIS */}
+                  <div
+                    className="mural-reacoes-container"
+                    onClick={(e) => e.stopPropagation()}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      flexWrap: 'wrap',
+                      marginTop: '18px',
+                      position: 'relative'
+                    }}
+                  >
+                    {/* Botões de reações já computadas com lista de nomes no hover */}
+                    {aviso.reacoesAgrupadas.map((r) => (
+                      <button
+                        key={r.emoji}
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleToggleReacao(aviso.id, r.emoji);
+                        }}
+                        title={r.nomes.join(', ')}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          padding: '3px 10px',
+                          borderRadius: '9999px',
+                          border: r.jaReagiu
+                            ? '1.5px solid #2DD4BF'
+                            : '1px solid var(--border-card, #CBD5E1)',
+                          backgroundColor: r.jaReagiu
+                            ? 'rgba(45, 212, 191, 0.18)'
+                            : 'var(--bg-card, #FFFFFF)',
+                          color: r.jaReagiu ? '#2DD4BF' : 'var(--texto-primario, #1E293B)',
+                          fontSize: '0.84rem',
+                          fontWeight: '700',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <span>{r.emoji}</span>
+                        <span style={{ fontSize: '0.78rem' }}>{r.total}</span>
+                      </button>
+                    ))}
+
+                    {/* Botão para abrir o seletor de emojis */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPickerAbertoId((prev) => (String(prev) === String(aviso.id) ? null : aviso.id));
+                      }}
+                      title="Adicionar reação"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        padding: '4px 10px',
+                        borderRadius: '9999px',
+                        border: '1px dashed var(--border-card, #CBD5E1)',
+                        backgroundColor: 'transparent',
+                        color: 'var(--texto-secundario, #64748B)',
+                        fontSize: '0.8rem',
+                        fontWeight: '700',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <span>{aviso.reacoesAgrupadas.length === 0 ? '😃 Reagir' : '➕'}</span>
+                    </button>
+
+                    {/* Menu flutuante de emojis */}
+                    {String(pickerAbertoId) === String(aviso.id) && (
+                      <div
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                          position: 'absolute',
+                          bottom: 'calc(100% + 10px)',
+                          left: '50%',
+                          transform: 'translateX(-50%)',
+                          backgroundColor: 'var(--bg-card, #FFFFFF)',
+                          border: '1.5px solid var(--border-card, #CBD5E1)',
+                          borderRadius: '9999px',
+                          padding: '4px 8px',
+                          boxShadow: '0 10px 28px rgba(0, 0, 0, 0.3)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          zIndex: 100,
+                          whiteSpace: 'nowrap',
+                          animation: 'cardFadeIn 0.15s ease'
+                        }}
+                      >
+                        {EMOJIS_PADRAO.map((emoji) => (
+                          <button
+                            key={emoji}
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleToggleReacao(aviso.id, emoji);
+                              setPickerAbertoId(null);
+                            }}
+                            className="btn-emoji-opcao"
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              fontSize: '1.3rem',
+                              cursor: 'pointer',
+                              padding: '4px 6px',
+                              borderRadius: '50%',
+                              lineHeight: 1,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              transition: 'transform 0.15s ease, background-color 0.15s ease'
+                            }}
+                            title={`Reagir com ${emoji}`}
+                          >
+                            {emoji}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: '1px dotted var(--border-card)', textAlign: 'center' }}>
                     <span style={{ color: '#2DD4BF', fontSize: '0.86rem', fontWeight: '800' }}>Clique para ver comunicado completo 🔍</span>
                   </div>
                 </div>
@@ -633,27 +966,49 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
               fontWeight: '600'
             }}>
               <span>🕒 {modalAviso.meta}</span>
-              <button
-                onClick={() => setModalAviso(null)}
-                style={{
-                  background: '#006968',
-                  color: '#FFFFFF',
-                  border: 'none',
-                  padding: '7px 18px',
-                  borderRadius: '8px',
-                  fontWeight: '700',
-                  cursor: 'pointer'
-                }}
-              >
-                Fechar
-              </button>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                {isSupervisor && (
+                  <button
+                    onClick={() => {
+                      const item = modalAviso;
+                      setModalAviso(null);
+                      handleAbrirEditarAviso(null, item);
+                    }}
+                    style={{
+                      background: 'transparent',
+                      color: 'var(--texto-primario)',
+                      border: '1px solid var(--border-card)',
+                      padding: '7px 16px',
+                      borderRadius: '8px',
+                      fontWeight: '700',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    ✏️ Editar
+                  </button>
+                )}
+                <button
+                  onClick={() => setModalAviso(null)}
+                  style={{
+                    background: '#006968',
+                    color: '#FFFFFF',
+                    border: 'none',
+                    padding: '7px 18px',
+                    borderRadius: '8px',
+                    fontWeight: '700',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Fechar
+                </button>
+              </div>
             </div>
           </div>
         </div>,
         document.body
       )}
 
-      {/* MODAL PUBLICAR AVISO (CORRIGIDO: COM document.body) */}
+      {/* MODAL PUBLICAR / EDITAR AVISO */}
       {isMounted && modalPublicar && createPortal(
         <div
           style={{
@@ -667,7 +1022,10 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
             zIndex: 9999,
             padding: '20px'
           }}
-          onClick={() => setModalPublicar(false)}
+          onClick={() => {
+            setModalPublicar(false);
+            setAvisoEmEdicao(null);
+          }}
         >
           <div
             style={{
@@ -683,9 +1041,15 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <h3 style={{ margin: 0, fontSize: '1.3rem', fontWeight: '900', color: 'var(--texto-titulo-verde)' }}>
-                📢 Publicar no Mural Operacional
+                {avisoEmEdicao ? '✏️ Editar Comunicado Operacional' : '📢 Publicar no Mural Operacional'}
               </h3>
-              <button onClick={() => setModalPublicar(false)} style={{ background: 'var(--border-card)', color: 'var(--texto-primario)', border: 'none', width: '32px', height: '32px', borderRadius: '50%', cursor: 'pointer', fontWeight: '800' }}>
+              <button
+                onClick={() => {
+                  setModalPublicar(false);
+                  setAvisoEmEdicao(null);
+                }}
+                style={{ background: 'var(--border-card)', color: 'var(--texto-primario)', border: 'none', width: '32px', height: '32px', borderRadius: '50%', cursor: 'pointer', fontWeight: '800' }}
+              >
                 ✕
               </button>
             </div>
@@ -769,11 +1133,21 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '8px' }}>
-                <button type="button" onClick={() => setModalPublicar(false)} style={{ padding: '9px 18px', borderRadius: '8px', border: '1px solid var(--border-card)', backgroundColor: 'transparent', color: 'var(--texto-secundario)', fontWeight: '700', cursor: 'pointer' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setModalPublicar(false);
+                    setAvisoEmEdicao(null);
+                  }}
+                  style={{ padding: '9px 18px', borderRadius: '8px', border: '1px solid var(--border-card)', backgroundColor: 'transparent', color: 'var(--texto-secundario)', fontWeight: '700', cursor: 'pointer' }}
+                >
                   Cancelar
                 </button>
-                <button type="submit" style={{ padding: '9px 24px', borderRadius: '8px', border: 'none', backgroundColor: '#006968', color: '#FFFFFF', fontWeight: '800', cursor: 'pointer' }}>
-                  Publicar Aviso
+                <button
+                  type="submit"
+                  style={{ padding: '9px 24px', borderRadius: '8px', border: 'none', backgroundColor: '#006968', color: '#FFFFFF', fontWeight: '800', cursor: 'pointer' }}
+                >
+                  {avisoEmEdicao ? 'Salvar Alterações' : 'Publicar Aviso'}
                 </button>
               </div>
             </form>
