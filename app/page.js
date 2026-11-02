@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 
-// Telas do sistema com caminhos oficiais
+// Telas do sistema
 import HomeView from '../components/HomeView';
 import ColinhasBoard from '@/components/ColinhasBoard';
 import RegulamentosView from '@/components/RegulamentosView';
@@ -19,17 +19,18 @@ const estiloLabel = {
   fontSize: '0.82rem',
   fontWeight: '700',
   marginBottom: '6px',
-  color: '#334155'
+  color: 'var(--texto-secundario, #334155)'
 };
 
 const estiloInput = {
   width: '100%',
   padding: '11px 14px',
   borderRadius: '10px',
-  border: '1.5px solid #CBD5E1',
+  border: '1.5px solid var(--border-search, #CBD5E1)',
   fontSize: '0.92rem',
   outline: 'none',
-  backgroundColor: '#F8FAFC'
+  backgroundColor: 'var(--bg-input, #F8FAFC)',
+  color: 'var(--texto-primario, #1E293B)'
 };
 
 const obterEstiloPapel = (papel) => {
@@ -38,10 +39,10 @@ const obterEstiloPapel = (papel) => {
   if (p.includes('admin')) {
     return {
       rotulo: '👑 Administrador',
-      corTexto: '#6D28D9',
+      corTexto: '#A78BFA',
       corAvatar: '#7C3AED',
-      fundoTag: '#F5F3FF',
-      bordaTag: '#DDD6FE',
+      fundoTag: 'rgba(124, 58, 237, 0.18)',
+      bordaTag: 'rgba(124, 58, 237, 0.4)',
       sombra: '0 0 12px rgba(124, 58, 237, 0.35)'
     };
   }
@@ -49,20 +50,20 @@ const obterEstiloPapel = (papel) => {
   if (p.includes('supervis') || p.includes('lider') || p.includes('líder')) {
     return {
       rotulo: '⭐ Supervisão EV',
-      corTexto: '#B45309',
+      corTexto: '#FBBF24',
       corAvatar: '#D97706',
-      fundoTag: '#FFFBEB',
-      bordaTag: '#FDE68A',
+      fundoTag: 'rgba(217, 119, 6, 0.18)',
+      bordaTag: 'rgba(217, 119, 6, 0.4)',
       sombra: 'none'
     };
   }
 
   return {
     rotulo: 'Operação EV',
-    corTexto: '#0F766E',
+    corTexto: '#2DD4BF',
     corAvatar: '#006968',
-    fundoTag: '#F0FDFA',
-    bordaTag: '#CCFBF1',
+    fundoTag: 'rgba(45, 212, 191, 0.15)',
+    bordaTag: 'rgba(45, 212, 191, 0.35)',
     sombra: 'none'
   };
 };
@@ -72,13 +73,25 @@ export default function Page() {
   const [usuario, setUsuario] = useState(null);
   const [carregandoAuth, setCarregandoAuth] = useState(true);
 
+  // Tema Escuro / Claro
+  const [tema, setTema] = useState('light');
+
+  // Menu Dropdown do Perfil
+  const [menuPerfilAberto, setMenuPerfilAberto] = useState(false);
+  const menuPerfilRef = useRef(null);
+
+  // Modal de Alteração de Nome
+  const [modalNomeAberto, setModalNomeAberto] = useState(false);
+  const [novoNome, setNovoNome] = useState('');
+  const [salvandoNome, setSalvandoNome] = useState(false);
+
   // Primeiro acesso
   const [novaSenha, setNovaSenha] = useState('');
   const [confirmaSenha, setConfirmaSenha] = useState('');
   const [sucessoTroca, setSucessoTroca] = useState(false);
   const senhaJaAlterada = useRef(false);
 
-  // Formulário de Login
+  // Login
   const [emailInput, setEmailInput] = useState('');
   const [senhaInput, setSenhaInput] = useState('');
   const [enviando, setEnviando] = useState(false);
@@ -89,7 +102,32 @@ export default function Page() {
   const isSupervisor = role === 'supervisor' || role === 'admin';
   const mostrarModalPrimeiroAcesso = Boolean(usuario?.precisaTrocarSenha) || sucessoTroca;
 
-  // 1. CARREGAMENTO DO PERFIL
+  // 1. CARREGAMENTO DO TEMA SALVO
+  useEffect(() => {
+    const temaSalvo = localStorage.getItem('capitu_tema') || 'light';
+    setTema(temaSalvo);
+    document.documentElement.setAttribute('data-theme', temaSalvo);
+  }, []);
+
+  const alternarTema = () => {
+    const proximoTema = tema === 'light' ? 'dark' : 'light';
+    setTema(proximoTema);
+    localStorage.setItem('capitu_tema', proximoTema);
+    document.documentElement.setAttribute('data-theme', proximoTema);
+  };
+
+  // 2. FECHAR DROPDOWN AO CLICAR FORA
+  useEffect(() => {
+    const handleClickFora = (e) => {
+      if (menuPerfilRef.current && !menuPerfilRef.current.contains(e.target)) {
+        setMenuPerfilAberto(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickFora);
+    return () => document.removeEventListener('mousedown', handleClickFora);
+  }, []);
+
+  // 3. CARREGAMENTO DO PERFIL
   const carregarPerfil = useCallback(async (user) => {
     if (!user) {
       setUsuario(null);
@@ -122,13 +160,8 @@ export default function Page() {
     });
   }, []);
 
-  // 2. MONITORAMENTO DE SESSÃO
+  // 4. MONITORAMENTO DE SESSÃO
   useEffect(() => {
-    try {
-      localStorage.removeItem('capitu_session');
-      sessionStorage.removeItem('capitu_secure_session');
-    } catch {}
-
     let ativo = true;
 
     supabase.auth.getSession().then(async ({ data }) => {
@@ -150,7 +183,7 @@ export default function Page() {
     };
   }, [carregarPerfil]);
 
-  // 3. LOGOUT AUTOMÁTICO POR INATIVIDADE
+  // 5. TIMEOUT POR INATIVIDADE (30 MIN)
   useEffect(() => {
     if (!usuario?.id) return;
 
@@ -173,7 +206,30 @@ export default function Page() {
     };
   }, [usuario?.id]);
 
-  // 4. AUTENTICAÇÃO
+  // 6. ALTERAR NOME VIA RPC SEGURA
+  const handleSalvarNome = async (e) => {
+    e.preventDefault();
+    if (!novoNome.trim()) return;
+
+    setSalvandoNome(true);
+    try {
+      const nomeFormatado = novoNome.trim();
+      const { error } = await supabase.rpc('alterar_meu_nome', {
+        novo_nome: nomeFormatado
+      });
+
+      if (error) throw error;
+
+      setUsuario((prev) => ({ ...prev, nome: nomeFormatado }));
+      setModalNomeAberto(false);
+    } catch (err) {
+      alert('Erro ao atualizar nome: ' + (err.message || 'Falha na comunicação'));
+    } finally {
+      setSalvandoNome(false);
+    }
+  };
+
+  // 7. AUTENTICAÇÃO
   const handleLogin = async (e) => {
     e.preventDefault();
     setMsgErro('');
@@ -214,7 +270,7 @@ export default function Page() {
     }
   };
 
-  // 5. TROCA DE SENHA NO PRIMEIRO ACESSO
+  // 8. TROCA DE SENHA NO PRIMEIRO ACESSO
   const handleTrocarSenhaPrimeiroAcesso = async (e) => {
     e.preventDefault();
     setMsgErro('');
@@ -271,12 +327,10 @@ export default function Page() {
     }
   };
 
-  // 6. ENCERRAMENTO DE SESSÃO
+  // 9. LOGOUT
   const handleLogout = async () => {
     setMsgErro('');
-    setNovaSenha('');
-    setConfirmaSenha('');
-    senhaJaAlterada.current = false;
+    setMenuPerfilAberto(false);
     await supabase.auth.signOut();
     setUsuario(null);
     setView('inicio');
@@ -286,11 +340,11 @@ export default function Page() {
     return (
       <div style={{
         minHeight: '100vh',
-        backgroundColor: '#F5F3EC',
+        backgroundColor: 'var(--bg-pagina, #F8FAFC)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        color: '#004D4C',
+        color: '#2DD4BF',
         fontSize: '1.15rem',
         fontWeight: '800'
       }}>
@@ -299,22 +353,22 @@ export default function Page() {
     );
   }
 
-  // TELA DE LOGIN OBRIGATÓRIA
+  // TELA DE LOGIN
   if (!usuario) {
     return (
       <div style={{
         minHeight: '100vh',
-        backgroundColor: '#F5F3EC',
+        backgroundColor: 'var(--bg-pagina, #F8FAFC)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         padding: '24px'
       }}>
         <div style={{
-          backgroundColor: '#FFFFFF',
+          backgroundColor: 'var(--bg-card, #FFFFFF)',
           borderRadius: '24px',
-          border: '1px solid #E2E8F0',
-          boxShadow: '0 20px 45px rgba(0, 77, 76, 0.08)',
+          border: '1px solid var(--border-card, #E2E8F0)',
+          boxShadow: '0 20px 45px rgba(0, 0, 0, 0.12)',
           width: '100%',
           maxWidth: '440px',
           padding: '44px 38px',
@@ -335,20 +389,20 @@ export default function Page() {
               📚
             </div>
             <div style={{ textAlign: 'left' }}>
-              <span style={{ fontSize: '0.64rem', fontWeight: '800', color: '#004D4C', letterSpacing: '0.8px', display: 'block' }}>
+              <span style={{ fontSize: '0.64rem', fontWeight: '800', color: 'var(--texto-titulo-verde)', letterSpacing: '0.8px', display: 'block' }}>
                 ESTANTE VIRTUAL
               </span>
               <div style={{ fontSize: '1.25rem', fontWeight: '900', lineHeight: 1.1 }}>
-                <span style={{ color: '#004D4C' }}>Portal </span>
+                <span style={{ color: 'var(--texto-primario)' }}>Portal </span>
                 <span style={{ color: '#2DD4BF' }}>Capitu</span>
               </div>
             </div>
           </div>
 
-          <h2 style={{ fontSize: '1.35rem', fontWeight: '900', color: '#004D4C', margin: '14px 0 6px 0' }}>
+          <h2 style={{ fontSize: '1.35rem', fontWeight: '900', color: 'var(--texto-primario)', margin: '14px 0 6px 0' }}>
             Acesso Operacional
           </h2>
-          <p style={{ fontSize: '0.86rem', color: '#64748B', margin: '0 0 26px 0', lineHeight: '1.45' }}>
+          <p style={{ fontSize: '0.86rem', color: 'var(--texto-secundario)', margin: '0 0 26px 0', lineHeight: '1.45' }}>
             Entre com suas credenciais corporativas para consultar colinhas, regras e links.
           </p>
 
@@ -405,7 +459,7 @@ export default function Page() {
               type="submit"
               disabled={enviando}
               style={{
-                backgroundColor: '#004D4C',
+                backgroundColor: '#006968',
                 color: '#FFFFFF',
                 border: 'none',
                 padding: '12px',
@@ -414,31 +468,98 @@ export default function Page() {
                 fontWeight: '800',
                 cursor: enviando ? 'not-allowed' : 'pointer',
                 marginTop: '6px',
-                boxShadow: '0 4px 14px rgba(0, 77, 76, 0.25)',
+                boxShadow: '0 4px 14px rgba(0, 105, 104, 0.25)',
                 opacity: enviando ? 0.7 : 1
               }}
             >
               {enviando ? 'Validando acesso...' : 'Entrar no Portal'}
             </button>
           </form>
-
-          <div style={{ marginTop: '28px', paddingTop: '18px', borderTop: '1px solid #F1F5F9' }}>
-            <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748B', lineHeight: '1.5' }}>
-              Novo operador ou esqueceu a senha? Solicite o cadastro ou reset de acesso junto à <strong>equipe de TI</strong>.
-            </p>
-          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#F8FAFC' }}>
+    <div style={{ minHeight: '100vh', backgroundColor: 'var(--bg-pagina, #F8FAFC)' }}>
+
+      {/* SISTEMA DE VARIÁVEIS DE TEMA GLOBAL */}
+      <style>{`
+        :root {
+          --bg-pagina: #F8FAFC;
+          --bg-header: #FFFFFF;
+          --border-cabecalho: #E2E8F0;
+          --texto-primario: #0F172A;
+          --texto-secundario: #475569;
+          --texto-titulo-verde: #004D4C;
+          --texto-destaque-turquesa: #006968;
+          --bg-card: #FFFFFF;
+          --border-card: #E2E8F0;
+          --bg-search: #FFFFFF;
+          --border-search: #CBD5E1;
+          --text-search: #1E293B;
+          --placeholder-search: #94A3B8;
+          --bg-dropdown: #FFFFFF;
+          --bg-dropdown-hover: #F1F5F9;
+          --borda-dropdown: #E2E8F0;
+          --bg-mural-page: #F5F3EC;
+          --bg-item-aberto: #F8FAFC;
+          --bg-subconteudo: #FFFFFF;
+          --bg-input: #F8FAFC;
+        }
+
+        [data-theme="dark"] {
+          --bg-pagina: #0A141A;
+          --bg-header: #0F1E27;
+          --border-cabecalho: #1E3442;
+          --texto-primario: #F8FAFC;
+          --texto-secundario: #CBD5E1;
+          --texto-titulo-verde: #2DD4BF;
+          --texto-destaque-turquesa: #5EEAD4;
+          --bg-card: #13222D;
+          --border-card: #1E3545;
+          --bg-search: #13222D;
+          --border-search: #1E3545;
+          --text-search: #F8FAFC;
+          --placeholder-search: #64748B;
+          --bg-dropdown: #0F1E27;
+          --bg-dropdown-hover: #1A2F3D;
+          --borda-dropdown: #1E3442;
+          --bg-mural-page: #0A141A;
+          --bg-item-aberto: #162836;
+          --bg-subconteudo: #0F1A22;
+          --bg-input: #0F1A24;
+        }
+
+        .perfil-gatilho-btn:hover {
+          background-color: var(--bg-dropdown-hover);
+        }
+
+        .dropdown-opcao-btn {
+          width: 100%;
+          text-align: left;
+          background: none;
+          border: none;
+          padding: 10px 14px;
+          border-radius: 8px;
+          font-size: 0.88rem;
+          font-weight: 700;
+          color: var(--texto-primario);
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          transition: background-color 0.15s ease;
+        }
+        .dropdown-opcao-btn:hover {
+          background-color: var(--bg-dropdown-hover);
+        }
+      `}</style>
 
       {/* NAVBAR SUPERIOR */}
       <header style={{
-        backgroundColor: '#FFFFFF',
-        borderBottom: '1px solid #E2E8F0',
+        backgroundColor: 'var(--bg-header)',
+        borderBottom: '1px solid var(--border-cabecalho)',
         padding: '14px 32px',
         display: 'flex',
         justifyContent: 'space-between',
@@ -447,6 +568,7 @@ export default function Page() {
         top: 0,
         zIndex: 100
       }}>
+        {/* LOGO */}
         <div
           onClick={() => setView('inicio')}
           style={{
@@ -475,20 +597,20 @@ export default function Page() {
             <span style={{
               fontSize: '0.64rem',
               fontWeight: '800',
-              color: '#004D4C',
+              color: 'var(--texto-titulo-verde)',
               letterSpacing: '0.8px',
               textTransform: 'uppercase'
             }}>
               ESTANTE VIRTUAL
             </span>
             <div style={{ fontSize: '1.25rem', fontWeight: '900', lineHeight: 1.1 }}>
-              <span style={{ color: '#004D4C' }}>Portal </span>
+              <span style={{ color: 'var(--texto-primario)' }}>Portal </span>
               <span style={{ color: '#2DD4BF' }}>Capitu</span>
             </div>
           </div>
         </div>
 
-        {/* NAVEGAÇÃO ENTRE AS PÁGINAS */}
+        {/* NAVEGAÇÃO ENTRE TELAS */}
         <nav style={{ display: 'flex', gap: '8px' }}>
           {[
             { id: 'inicio', label: 'Início', icone: '🏠' },
@@ -501,7 +623,7 @@ export default function Page() {
               onClick={() => setView(item.id)}
               style={{
                 backgroundColor: view === item.id ? '#006968' : 'transparent',
-                color: view === item.id ? '#FFFFFF' : '#475569',
+                color: view === item.id ? '#FFFFFF' : 'var(--texto-secundario)',
                 border: 'none',
                 padding: '8px 18px',
                 borderRadius: '9999px',
@@ -519,82 +641,132 @@ export default function Page() {
           ))}
         </nav>
 
-        {/* ÁREA DE PERFIL */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+        {/* PERFIL ALINHADO À DIREITA COM DROPDOWN */}
+        <div style={{ position: 'relative' }} ref={menuPerfilRef}>
           {(() => {
             const estilo = obterEstiloPapel(role);
             return (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{
-                  width: '40px',
-                  height: '40px',
-                  borderRadius: '50%',
-                  backgroundColor: estilo.corAvatar,
-                  color: '#FFFFFF',
-                  fontWeight: '800',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '0.9rem',
-                  boxShadow: estilo.sombra
-                }}>
-                  {usuario.nome ? usuario.nome.slice(0, 2).toUpperCase() : 'EV'}
-                </div>
+              <>
+                <div
+                  className="perfil-gatilho-btn"
+                  onClick={() => setMenuPerfilAberto(!menuPerfilAberto)}
+                  title="Clique para ver opções do perfil"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    cursor: 'pointer',
+                    userSelect: 'none',
+                    padding: '6px 10px',
+                    borderRadius: '12px',
+                    transition: 'background-color 0.15s ease'
+                  }}
+                >
+                  <div style={{
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '50%',
+                    backgroundColor: estilo.corAvatar,
+                    color: '#FFFFFF',
+                    fontWeight: '800',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '0.9rem',
+                    boxShadow: estilo.sombra
+                  }}>
+                    {usuario.nome ? usuario.nome.slice(0, 2).toUpperCase() : 'EV'}
+                  </div>
 
-                <div style={{ textAlign: 'left', lineHeight: '1.2' }}>
-                  <div style={{ fontSize: '0.9rem', fontWeight: '800', color: '#1E293B' }}>
-                    {usuario.nome}
+                  <div style={{ textAlign: 'left', lineHeight: '1.2' }}>
+                    <div style={{ fontSize: '0.9rem', fontWeight: '800', color: 'var(--texto-primario)' }}>
+                      {usuario.nome}
+                    </div>
+
+                    <span style={{
+                      display: 'inline-block',
+                      marginTop: '3px',
+                      fontSize: '0.72rem',
+                      fontWeight: '800',
+                      color: estilo.corTexto,
+                      backgroundColor: estilo.fundoTag,
+                      border: `1px solid ${estilo.bordaTag}`,
+                      padding: '2px 8px',
+                      borderRadius: '9999px',
+                      letterSpacing: '0.3px'
+                    }}>
+                      {estilo.rotulo}
+                    </span>
                   </div>
 
                   <span style={{
-                    display: 'inline-block',
-                    marginTop: '3px',
-                    fontSize: '0.72rem',
-                    fontWeight: '800',
-                    color: estilo.corTexto,
-                    backgroundColor: estilo.fundoTag,
-                    border: `1px solid ${estilo.bordaTag}`,
-                    padding: '2px 8px',
-                    borderRadius: '9999px',
-                    letterSpacing: '0.3px'
+                    fontSize: '0.75rem',
+                    color: 'var(--texto-secundario)',
+                    marginLeft: '4px',
+                    transform: menuPerfilAberto ? 'rotate(180deg)' : 'rotate(0deg)',
+                    transition: 'transform 0.18s ease'
                   }}>
-                    {estilo.rotulo}
+                    ▼
                   </span>
                 </div>
 
-                <button
-                  onClick={handleLogout}
-                  title="Sair do portal"
-                  style={{
-                    background: '#F1F5F9',
-                    border: 'none',
-                    padding: '6px 12px',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    fontSize: '0.8rem',
-                    color: '#64748B',
-                    fontWeight: '700',
-                    marginLeft: '6px',
-                    transition: 'all 0.15s ease'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#FEE2E2';
-                    e.currentTarget.style.color = '#DC2626';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = '#F1F5F9';
-                    e.currentTarget.style.color = '#64748B';
-                  }}
-                >
-                  Sair
-                </button>
-              </div>
+                {/* MENU SUSPENSO */}
+                {menuPerfilAberto && (
+                  <div style={{
+                    position: 'absolute',
+                    top: 'calc(100% + 8px)',
+                    right: 0,
+                    width: '220px',
+                    backgroundColor: 'var(--bg-dropdown)',
+                    borderRadius: '14px',
+                    border: '1px solid var(--borda-dropdown)',
+                    boxShadow: '0 12px 30px rgba(0, 0, 0, 0.25)',
+                    padding: '6px',
+                    zIndex: 1000,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '3px'
+                  }}>
+                    <button
+                      className="dropdown-opcao-btn"
+                      onClick={() => {
+                        setNovoNome(usuario.nome || '');
+                        setModalNomeAberto(true);
+                        setMenuPerfilAberto(false);
+                      }}
+                    >
+                      <span>✏️</span> Alterar nome
+                    </button>
+
+                    <button
+                      className="dropdown-opcao-btn"
+                      onClick={() => {
+                        alternarTema();
+                        setMenuPerfilAberto(false);
+                      }}
+                    >
+                      <span>{tema === 'light' ? '🌙' : '☀️'}</span>
+                      {tema === 'light' ? 'Modo Escuro' : 'Modo Claro'}
+                    </button>
+
+                    <hr style={{ border: 'none', borderTop: '1px solid var(--borda-dropdown)', margin: '4px 0' }} />
+
+                    <button
+                      className="dropdown-opcao-btn"
+                      onClick={handleLogout}
+                      style={{ color: '#EF4444' }}
+                    >
+                      <span>🚪</span> Sair da conta
+                    </button>
+                  </div>
+                )}
+              </>
             );
           })()}
         </div>
       </header>
 
-      {/* TELAS PERSISTENTES: SEM DESTRUIR DOM (Zero travamento ao alternar abas) */}
+      {/* TELAS PERSISTENTES EM MEMÓRIA (0 MS DE LATÊNCIA) */}
       {!usuario.precisaTrocarSenha && (
         <main style={{ minHeight: 'calc(100vh - 72px)' }}>
           <div style={{ display: view === 'inicio' ? 'block' : 'none' }}>
@@ -626,6 +798,87 @@ export default function Page() {
         </main>
       )}
 
+      {/* MODAL: ALTERAR NOME (DISPONÍVEL PARA QUALQUER PERFIL) */}
+      {modalNomeAberto && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          backgroundColor: 'rgba(0, 20, 20, 0.7)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 3500,
+          padding: '20px'
+        }}>
+          <div style={{
+            backgroundColor: 'var(--bg-card, #FFFFFF)',
+            borderRadius: '20px',
+            width: '100%',
+            maxWidth: '440px',
+            padding: '30px',
+            border: '1px solid var(--border-card, #E2E8F0)',
+            boxShadow: '0 20px 45px rgba(0, 0, 0, 0.25)'
+          }}>
+            <h3 style={{ margin: '0 0 10px 0', fontSize: '1.3rem', fontWeight: '900', color: 'var(--texto-titulo-verde)' }}>
+              ✏️ Alterar Nome de Exibição
+            </h3>
+            <p style={{ margin: '0 0 18px 0', fontSize: '0.86rem', color: 'var(--texto-secundario)' }}>
+              Esse nome será atualizado no seu perfil e refletido nos seus registros.
+            </p>
+
+            <form onSubmit={handleSalvarNome} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div>
+                <label style={estiloLabel}>Seu nome completo:</label>
+                <input
+                  type="text"
+                  required
+                  maxLength={70}
+                  value={novoNome}
+                  onChange={(e) => setNovoNome(e.target.value)}
+                  style={estiloInput}
+                  placeholder="Ex: Eduardo Henrique"
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '6px' }}>
+                <button
+                  type="button"
+                  onClick={() => setModalNomeAberto(false)}
+                  style={{
+                    backgroundColor: 'transparent',
+                    border: '1px solid var(--border-card, #CBD5E1)',
+                    padding: '9px 18px',
+                    borderRadius: '8px',
+                    fontWeight: '700',
+                    color: 'var(--texto-secundario, #64748B)',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={salvandoNome}
+                  style={{
+                    backgroundColor: '#006968',
+                    color: '#FFFFFF',
+                    border: 'none',
+                    padding: '9px 20px',
+                    borderRadius: '8px',
+                    fontWeight: '800',
+                    cursor: salvandoNome ? 'not-allowed' : 'pointer',
+                    opacity: salvandoNome ? 0.7 : 1
+                  }}
+                >
+                  {salvandoNome ? 'Salvando...' : 'Salvar Alteração'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* MODAL DE PRIMEIRO ACESSO */}
       {mostrarModalPrimeiroAcesso && (
         <div
@@ -643,11 +896,12 @@ export default function Page() {
         >
           <div
             style={{
-              backgroundColor: '#FFFFFF',
+              backgroundColor: 'var(--bg-card, #FFFFFF)',
               borderRadius: '20px',
               padding: '36px 40px',
               width: '100%',
               maxWidth: '460px',
+              border: '1px solid var(--border-card, #E2E8F0)',
               boxShadow: '0 25px 60px rgba(0, 0, 0, 0.35)',
               position: 'relative'
             }}
@@ -668,10 +922,10 @@ export default function Page() {
                 }}>
                   ✓
                 </div>
-                <h3 style={{ margin: '0 0 8px 0', fontSize: '1.35rem', fontWeight: '900', color: '#004D4C' }}>
+                <h3 style={{ margin: '0 0 8px 0', fontSize: '1.35rem', fontWeight: '900', color: 'var(--texto-titulo-verde)' }}>
                   Senha cadastrada com sucesso!
                 </h3>
-                <p style={{ margin: 0, fontSize: '0.9rem', color: '#64748B' }}>
+                <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--texto-secundario)' }}>
                   Bem-vindo(a) ao Portal Capitu. Acessando o painel...
                 </p>
               </div>
@@ -679,10 +933,10 @@ export default function Page() {
               <>
                 <div style={{ textAlign: 'center', marginBottom: '24px' }}>
                   <div style={{ fontSize: '2.6rem', marginBottom: '8px' }}>🛡️</div>
-                  <h3 style={{ margin: 0, fontSize: '1.45rem', fontWeight: '800', color: '#004D4C' }}>
+                  <h3 style={{ margin: 0, fontSize: '1.45rem', fontWeight: '800', color: 'var(--texto-titulo-verde)' }}>
                     Primeiro Acesso: Nova Senha
                   </h3>
-                  <p style={{ margin: '8px 0 0 0', fontSize: '0.86rem', color: '#64748B', lineHeight: '1.5' }}>
+                  <p style={{ margin: '8px 0 0 0', fontSize: '0.86rem', color: 'var(--texto-secundario)', lineHeight: '1.5' }}>
                     Você está utilizando uma senha temporária. Defina sua nova senha de acesso para prosseguir.
                   </p>
                 </div>
@@ -758,22 +1012,6 @@ export default function Page() {
                     }}
                   >
                     {enviando ? 'Salvando credencial...' : 'Salvar Senha e Entrar'}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleLogout}
-                    style={{
-                      backgroundColor: 'transparent',
-                      border: 'none',
-                      color: '#64748B',
-                      fontSize: '0.82rem',
-                      fontWeight: '700',
-                      cursor: 'pointer',
-                      padding: '6px'
-                    }}
-                  >
-                    Sair
                   </button>
                 </form>
               </>

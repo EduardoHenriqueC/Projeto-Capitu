@@ -5,7 +5,6 @@ import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
 
 export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
-  // 1. ESTADOS DO COMPONENTE
   const [filtroAvisos, setFiltroAvisos] = useState('todos');
   const [modalAviso, setModalAviso] = useState(null);
   const [modalPublicar, setModalPublicar] = useState(false);
@@ -14,7 +13,6 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
   const [toast, setToast] = useState({ visivel: false, mensagem: '', tipo: 'sucesso' });
   const [isMounted, setIsMounted] = useState(false);
 
-  // Estado do formulário de publicação
   const [formNovo, setFormNovo] = useState({
     titulo: '',
     tagSetor: 'TI/Financeiro',
@@ -33,7 +31,6 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
     setIsMounted(true);
   }, []);
 
-  // 2. BUSCA DE AVISOS NO SUPABASE
   const buscarAvisos = async () => {
     try {
       setCarregando(true);
@@ -53,21 +50,21 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
           const badges = [
             {
               rotulo: item.tipo === 'urgente' ? 'URGENTE' : 'INFORMATIVO',
-              bg: item.tipo === 'urgente' ? '#FEE2E2' : '#E0F2FE',
-              cor: item.tipo === 'urgente' ? '#991B1B' : '#0369A1'
+              bg: item.tipo === 'urgente' ? 'rgba(239, 68, 68, 0.18)' : 'rgba(56, 189, 248, 0.18)',
+              cor: item.tipo === 'urgente' ? '#F87171' : '#38BDF8'
             }
           ];
 
           if (item.status_extra && item.status_extra !== 'Nenhum') {
             badges.push({
               rotulo: item.status_extra,
-              bg: item.status_extra === '✓ SOLUCIONADO' ? '#DCFCE7' : item.status_extra === '⏳ EM ANDAMENTO' ? '#FEF3C7' : '#F1F5F9',
-              cor: item.status_extra === '✓ SOLUCIONADO' ? '#166534' : item.status_extra === '⏳ EM ANDAMENTO' ? '#92400E' : '#334155'
+              bg: item.status_extra === '✓ SOLUCIONADO' ? 'rgba(34, 197, 94, 0.18)' : 'rgba(234, 179, 8, 0.18)',
+              cor: item.status_extra === '✓ SOLUCIONADO' ? '#4ADE80' : '#FDE047'
             });
           }
 
           if (item.fixado) {
-            badges.push({ rotulo: '📌 FIXADO', bg: '#E2E8F0', cor: '#334155' });
+            badges.push({ rotulo: '📌 FIXADO', bg: 'rgba(148, 163, 184, 0.2)', cor: '#CBD5E1' });
           }
 
           return {
@@ -75,16 +72,15 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
             tipo: item.tipo,
             fixado: item.fixado,
             tagSetor: item.tag_setor,
-            corRibbon: item.tipo === 'urgente' ? '#E05A36' : '#02807E',
-            corRibbonSombra: item.tipo === 'urgente' ? '#B23A1A' : '#004D4C',
-            tagBg: item.tipo === 'urgente' ? '#FEF3C7' : '#CCFBF1',
-            tagColor: item.tipo === 'urgente' ? '#92400E' : '#0F766E',
+            corRibbon: item.tipo === 'urgente' ? '#EF4444' : '#0D9488',
+            corRibbonSombra: 'rgba(0, 0, 0, 0.4)',
+            tagBg: 'rgba(45, 212, 191, 0.15)',
+            tagColor: '#2DD4BF',
             badgeStatus: badges,
             titulo: item.titulo,
             meta: `Publicado às ${hora} • ${item.autor_nome || 'Supervisão EV'} • ${item.tag_setor}`,
             descricao: item.descricao,
-            borda: item.tipo === 'urgente' ? '#F59E0B' : '#14B8A6',
-            fundo: item.tipo === 'urgente' ? '#FFFDF9' : '#F8FCFB'
+            borda: item.tipo === 'urgente' ? '#DC2626' : '#0D9488'
           };
         });
         setAvisos(formatados);
@@ -111,7 +107,6 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
     };
   }, []);
 
-  // 3. AÇÕES DO SUPERVISOR
   const handleSalvarAviso = async (e) => {
     e.preventDefault();
     if (!formNovo.titulo.trim() || !formNovo.descricao.trim()) {
@@ -171,7 +166,6 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
     }
   };
 
-  // 4. FILTRAGEM
   const avisosFiltrados = avisos.filter((aviso) => {
     if (filtroAvisos === 'urgentes') return aviso.tipo === 'urgente';
     if (filtroAvisos === 'fixados') return aviso.fixado;
@@ -179,7 +173,7 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
   });
 
   return (
-    <div style={{ backgroundColor: '#F5F3EC', minHeight: '100vh', paddingBottom: '90px', position: 'relative', overflowX: 'hidden' }}>
+    <div style={{ backgroundColor: 'var(--bg-mural-page, #F5F3EC)', minHeight: '100vh', paddingBottom: '90px', position: 'relative', overflowX: 'hidden' }}>
       
       <style>{`
         @keyframes cardFadeIn {
@@ -189,71 +183,49 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
         .mural-cards-wrapper {
           animation: cardFadeIn 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
+
         .mural-btn-all {
-          background-color: #FFFFFF;
-          border: 1px solid #CBD5E1;
+          background-color: var(--bg-card, #FFFFFF);
+          border: 1px solid var(--border-card, #CBD5E1);
+          color: var(--texto-secundario, #475569);
           padding: 6px 16px;
           border-radius: 9999px;
           font-size: 0.8rem;
           font-weight: 700;
           cursor: pointer;
-          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);
-          transition: all 0.24s cubic-bezier(0.16, 1, 0.3, 1);
-        }
-        .mural-btn-all:hover { transform: translateY(-1px); }
-        .mural-btn-all:active { transform: scale(0.95); }
-
-        .mural-btn-publish {
-          background-color: var(--ev-teal-dark, #004D4C);
-          color: #FFFFFF;
-          border: 1px solid var(--ev-turquoise, #5EEAD4);
-          padding: 7px 18px;
-          border-radius: 9999px;
-          font-size: 0.82rem;
-          font-weight: 800;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          box-shadow: 0 3px 8px rgba(0, 50, 50, 0.15);
           transition: all 0.2s ease;
         }
-        .mural-btn-publish:hover {
-          background-color: var(--ev-teal-primary, #006968);
-          transform: translateY(-1px);
-          box-shadow: 0 5px 14px rgba(0, 50, 50, 0.22);
-        }
+        .mural-btn-all:hover { transform: translateY(-1px); }
 
         .mural-filter-pill {
           padding: 5px 16px;
           border-radius: 9999px;
-          border: 1.5px solid #CBD5E1;
-          background-color: rgba(255, 255, 255, 0.6);
-          color: #475569;
+          border: 1.5px solid var(--border-card, #CBD5E1);
+          background-color: var(--bg-card, rgba(255, 255, 255, 0.6));
+          color: var(--texto-secundario, #475569);
           font-size: 0.8rem;
           font-weight: 700;
           cursor: pointer;
-          transition: all 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+          transition: all 0.2s ease;
         }
-        .mural-filter-pill:hover { transform: translateY(-1px); }
-        .mural-filter-pill:active { transform: scale(0.95); }
         .mural-filter-pill.active {
-          border-color: var(--ev-teal-primary, #006968);
-          background-color: #FFFFFF;
-          color: var(--ev-teal-primary, #006968);
-          box-shadow: 0 3px 8px rgba(0, 105, 104, 0.12);
+          border-color: #2DD4BF;
+          background-color: var(--bg-card, #FFFFFF);
+          color: #2DD4BF;
+          box-shadow: 0 3px 8px rgba(45, 212, 191, 0.15);
         }
 
         .mural-card-item {
+          background-color: var(--bg-card, #FFFFFF);
           border-style: solid;
-          border-top-width: 3px;
-          border-right-width: 3px;
-          border-bottom-width: 3px;
-          border-left-width: 12px;
+          border-top-width: 1.5px;
+          border-right-width: 1.5px;
+          border-bottom-width: 1.5px;
+          border-left-width: 10px;
           border-radius: 20px;
           padding: 28px 32px 24px 32px;
           position: relative;
-          box-shadow: 0 10px 26px rgba(0, 50, 50, 0.07);
+          box-shadow: 0 10px 26px rgba(0, 0, 0, 0.08);
           display: flex;
           flex-direction: column;
           justifyContent: space-between;
@@ -262,18 +234,20 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
         }
         .mural-card-item:hover {
           transform: translateY(-3px);
-          box-shadow: 0 14px 32px rgba(0, 50, 50, 0.11);
+          box-shadow: 0 14px 32px rgba(0, 0, 0, 0.14);
         }
 
-        @media (max-width: 1240px) {
-          .mural-book-decor { display: none !important; }
-          .mural-cards-wrapper { margin: 0 auto !important; max-width: 100% !important; }
+        [data-theme="dark"] .mural-book-decor svg line,
+        [data-theme="dark"] .mural-book-decor svg path,
+        [data-theme="dark"] .mural-book-decor svg rect {
+          stroke: #1E3545 !important;
+          fill: #0F1E27 !important;
         }
       `}</style>
 
       {/* BANNER PRINCIPAL */}
       <div style={{
-        background: 'linear-gradient(135deg, var(--ev-teal-dark, #004D4C) 0%, var(--ev-teal-primary, #006968) 70%, #017B79 100%)',
+        background: 'linear-gradient(135deg, #004D4C 0%, #006968 70%, #017B79 100%)',
         color: '#FFFFFF',
         padding: '50px 24px 76px 24px',
         textAlign: 'center',
@@ -282,50 +256,72 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
       }}>
         <div style={{ maxWidth: '1260px', margin: '0 auto' }}>
           <h1 style={{ fontSize: '3rem', fontWeight: '800', letterSpacing: '-0.8px', marginBottom: '12px', color: '#FFFFFF' }}>
-            Qual a leitura <span style={{ color: 'var(--ev-turquoise, #5EEAD4)' }}>de hoje?</span>
+            Qual a leitura <span style={{ color: '#5EEAD4' }}>de hoje?</span>
           </h1>
           <p style={{ fontSize: '1.08rem', color: 'rgba(255, 255, 255, 0.9)', lineHeight: '1.6', marginBottom: '32px' }}>
             Encontre rapidamente regras operacionais, colinhas e regulamentos oficiais da Estante Virtual.
           </p>
 
           <div style={{ maxWidth: '680px', margin: '0 auto 46px auto', position: 'relative', display: 'flex', alignItems: 'center' }}>
-            <span style={{ position: 'absolute', left: '20px', color: 'var(--ev-teal-primary, #006968)', fontSize: '1.25rem', pointerEvents: 'none' }}>🔍</span>
+            <span style={{ position: 'absolute', left: '20px', color: '#2DD4BF', fontSize: '1.25rem', pointerEvents: 'none' }}>🔍</span>
             <input
               type="text"
               placeholder="Digite uma dúvida, erro, regra de frete, devolução ou PIX..."
               onKeyDown={(e) => { if (e.key === 'Enter') setView('regulamentos'); }}
-              style={{ width: '100%', padding: '16px 120px 16px 56px', borderRadius: '9999px', border: 'none', fontSize: '1rem', fontWeight: '500', outline: 'none', backgroundColor: '#FFFFFF', color: '#1E293B', boxShadow: '0 10px 30px rgba(0, 0, 0, 0.16)' }}
+              style={{
+                width: '100%',
+                padding: '16px 120px 16px 56px',
+                borderRadius: '9999px',
+                border: '1.5px solid var(--border-search, #CBD5E1)',
+                fontSize: '1rem',
+                fontWeight: '500',
+                outline: 'none',
+                backgroundColor: 'var(--bg-search, #FFFFFF)',
+                color: 'var(--text-search, #1E293B)',
+                boxShadow: '0 10px 30px rgba(0, 0, 0, 0.16)'
+              }}
             />
             <button
               onClick={() => setView('regulamentos')}
-              style={{ position: 'absolute', right: '8px', background: 'var(--ev-teal-primary, #006968)', color: '#FFFFFF', border: 'none', padding: '10px 24px', borderRadius: '9999px', fontSize: '0.9rem', fontWeight: '700', cursor: 'pointer', transition: 'background 0.2s ease' }}
+              style={{
+                position: 'absolute',
+                right: '8px',
+                background: '#006968',
+                color: '#FFFFFF',
+                border: 'none',
+                padding: '10px 24px',
+                borderRadius: '9999px',
+                fontSize: '0.9rem',
+                fontWeight: '700',
+                cursor: 'pointer'
+              }}
             >
               Buscar
             </button>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '24px', textAlign: 'left' }}>
-            <div onClick={() => setView('colinhas')} style={{ backgroundColor: '#FFFFFF', borderRadius: '18px', padding: '18px 24px', display: 'flex', alignItems: 'center', gap: '16px', boxShadow: '0 8px 24px rgba(0, 35, 35, 0.12)', cursor: 'pointer', transition: 'transform 0.22s ease, box-shadow 0.22s ease' }}>
-              <div style={{ width: '48px', height: '48px', borderRadius: '14px', backgroundColor: 'rgba(50, 188, 163, 0.16)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', flexShrink: 0 }}>📝</div>
+            <div onClick={() => setView('colinhas')} style={{ backgroundColor: 'var(--bg-card, #FFFFFF)', border: '1px solid var(--border-card, transparent)', borderRadius: '18px', padding: '18px 24px', display: 'flex', alignItems: 'center', gap: '16px', boxShadow: '0 8px 24px rgba(0, 0, 0, 0.1)', cursor: 'pointer' }}>
+              <div style={{ width: '48px', height: '48px', borderRadius: '14px', backgroundColor: 'rgba(45, 212, 191, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', flexShrink: 0 }}>📝</div>
               <div style={{ flex: 1 }}>
-                <h4 style={{ margin: '0 0 3px 0', color: 'var(--ev-teal-dark, #004D4C)', fontSize: '1.05rem', fontWeight: '800' }}>Colinhas</h4>
-                <p style={{ margin: 0, color: '#475569', fontSize: '0.84rem', lineHeight: '1.45' }}>Textos prontos e máscaras para copiar e responder rápido no ticket.</p>
+                <h4 style={{ margin: '0 0 3px 0', color: 'var(--texto-titulo-verde)', fontSize: '1.05rem', fontWeight: '800' }}>Colinhas</h4>
+                <p style={{ margin: 0, color: 'var(--texto-secundario)', fontSize: '0.84rem', lineHeight: '1.45' }}>Textos prontos e máscaras para copiar e responder rápido no ticket.</p>
               </div>
             </div>
 
-            <div onClick={() => setView('regulamentos')} style={{ backgroundColor: '#FFFFFF', borderRadius: '18px', padding: '18px 24px', display: 'flex', alignItems: 'center', gap: '16px', boxShadow: '0 8px 24px rgba(0, 35, 35, 0.12)', cursor: 'pointer', transition: 'transform 0.22s ease, box-shadow 0.22s ease' }}>
+            <div onClick={() => setView('regulamentos')} style={{ backgroundColor: 'var(--bg-card, #FFFFFF)', border: '1px solid var(--border-card, transparent)', borderRadius: '18px', padding: '18px 24px', display: 'flex', alignItems: 'center', gap: '16px', boxShadow: '0 8px 24px rgba(0, 0, 0, 0.1)', cursor: 'pointer' }}>
               <div style={{ width: '48px', height: '48px', borderRadius: '14px', backgroundColor: 'rgba(255, 152, 0, 0.16)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', flexShrink: 0 }}>📜</div>
               <div style={{ flex: 1 }}>
-                <h4 style={{ margin: '0 0 3px 0', color: 'var(--ev-teal-dark, #004D4C)', fontSize: '1.05rem', fontWeight: '800' }}>Regulamentos</h4>
-                <p style={{ margin: 0, color: '#475569', fontSize: '0.84rem', lineHeight: '1.45' }}>Regras de negócio, prazos do CDC e políticas de plataforma.</p>
+                <h4 style={{ margin: '0 0 3px 0', color: 'var(--texto-titulo-verde)', fontSize: '1.05rem', fontWeight: '800' }}>Regulamentos</h4>
+                <p style={{ margin: 0, color: 'var(--texto-secundario)', fontSize: '0.84rem', lineHeight: '1.45' }}>Regras de negócio, prazos do CDC e políticas de plataforma.</p>
               </div>
             </div>
 
-            <div onClick={() => setView('links')} style={{ backgroundColor: '#FFFFFF', borderRadius: '18px', padding: '18px 24px', display: 'flex', alignItems: 'center', gap: '16px', boxShadow: '0 8px 24px rgba(0, 35, 35, 0.12)', cursor: 'pointer', transition: 'transform 0.22s ease, box-shadow 0.22s ease' }}>
-              <div style={{ width: '48px', height: '48px', borderRadius: '14px', backgroundColor: 'rgba(0, 105, 104, 0.14)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', flexShrink: 0 }}>🔗</div>
+            <div onClick={() => setView('links')} style={{ backgroundColor: 'var(--bg-card, #FFFFFF)', border: '1px solid var(--border-card, transparent)', borderRadius: '18px', padding: '18px 24px', display: 'flex', alignItems: 'center', gap: '16px', boxShadow: '0 8px 24px rgba(0, 0, 0, 0.1)', cursor: 'pointer' }}>
+              <div style={{ width: '48px', height: '48px', borderRadius: '14px', backgroundColor: 'rgba(0, 105, 104, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', flexShrink: 0 }}>🔗</div>
               <div style={{ flex: 1 }}>
-                <h4 style={{ margin: '0 0 3px 0', color: 'var(--ev-teal-dark, #004D4C)', fontSize: '1.05rem', fontWeight: '800' }}>Links Úteis</h4>
-                <p style={{ margin: 0, color: '#475569', fontSize: '0.84rem', lineHeight: '1.45' }}>Planilhas operacionais, sistemas (NCA/Zendesk) e formulários do time.</p>
+                <h4 style={{ margin: '0 0 3px 0', color: 'var(--texto-titulo-verde)', fontSize: '1.05rem', fontWeight: '800' }}>Links Úteis</h4>
+                <p style={{ margin: 0, color: 'var(--texto-secundario)', fontSize: '0.84rem', lineHeight: '1.45' }}>Planilhas operacionais, sistemas (NCA/Zendesk) e formulários do time.</p>
               </div>
             </div>
           </div>
@@ -338,10 +334,10 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', marginBottom: '22px', padding: '0 8px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <span style={{ fontSize: '1.7rem' }}>📢</span>
-            <h2 style={{ margin: 0, fontSize: '1.6rem', fontWeight: '800', color: 'var(--ev-teal-dark, #004D4C)', letterSpacing: '-0.3px' }}>
+            <h2 style={{ margin: 0, fontSize: '1.6rem', fontWeight: '800', color: 'var(--texto-primario)', letterSpacing: '-0.3px' }}>
               Mural de Avisos Operacionais
             </h2>
-            <span style={{ backgroundColor: '#DCFCE7', color: '#166534', fontSize: '0.72rem', fontWeight: '800', padding: '4px 12px', borderRadius: '9999px', letterSpacing: '0.6px', textTransform: 'uppercase' }}>
+            <span style={{ backgroundColor: 'rgba(34, 197, 94, 0.15)', color: '#4ADE80', fontSize: '0.72rem', fontWeight: '800', padding: '4px 12px', borderRadius: '9999px', letterSpacing: '0.6px', textTransform: 'uppercase' }}>
               TEMPO REAL
             </span>
           </div>
@@ -349,11 +345,26 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
             <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
               {isSupervisor && (
-                <button onClick={() => setModalPublicar(true)} className="mural-btn-publish">
-                  <span>🔐</span> Publicar Comunicado (Acesso Líder)
+                <button
+                  onClick={() => setModalPublicar(true)}
+                  style={{
+                    backgroundColor: '#006968',
+                    color: '#FFFFFF',
+                    border: 'none',
+                    padding: '7px 18px',
+                    borderRadius: '9999px',
+                    fontSize: '0.82rem',
+                    fontWeight: '800',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <span>🔐</span> Publicar Comunicado
                 </button>
               )}
-              <button onClick={() => setFiltroAvisos('todos')} className="mural-btn-all" style={{ color: filtroAvisos === 'todos' ? 'var(--ev-teal-primary, #006968)' : '#64748B' }}>
+              <button onClick={() => setFiltroAvisos('todos')} className="mural-btn-all">
                 Ver todos os avisos
               </button>
             </div>
@@ -370,10 +381,9 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
           </div>
         </div>
 
-        {/* CONTAINER DO MURAL COM ILUSTRAÇÕES DECORATIVAS NAS LATERAIS */}
-        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {/* CONTAINER DO MURAL COM ILUSTRAÇÕES DECORATIVAS */}
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '320px' }}>
           
-          {/* ILUSTRAÇÃO LATERAL ESQUERDA: ESTANTE & LIVROS */}
           <div className="mural-book-decor" style={{ position: 'absolute', left: '0px', top: '50%', transform: 'translateY(-50%)', width: '135px', pointerEvents: 'none', zIndex: 1 }}>
             <svg width="135" height="260" viewBox="0 0 135 260" fill="none" stroke="#8A7B68" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="12" y1="20" x2="12" y2="250" strokeWidth="2.2" />
@@ -398,21 +408,29 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
             </svg>
           </div>
 
-          {/* GRID DOS CARDS DO MURAL (SEM LINHAS LATERAIS E COM TEXTO CENTRALIZADO) */}
           <div key={filtroAvisos} className="mural-cards-wrapper" style={{ width: '100%', maxWidth: '1060px', margin: '0 150px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(440px, 1fr))', gap: '28px', position: 'relative', zIndex: 2 }}>
             {carregando ? (
-              <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '40px', color: '#64748B', fontWeight: '600' }}>
+              <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '40px', color: 'var(--texto-secundario)', fontWeight: '600' }}>
                 📖 Carregando os comunicados do mural...
               </div>
             ) : avisosFiltrados.length === 0 ? (
-              <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '40px', color: '#64748B', fontWeight: '600', background: '#FFFFFF', borderRadius: '16px', border: '1px dashed #CBD5E1' }}>
+              <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '40px', color: 'var(--texto-secundario)', background: 'var(--bg-card)', borderRadius: '16px', border: '1px dashed var(--border-card)' }}>
                 Nenhum comunicado operacional nesta categoria.
               </div>
             ) : (
               avisosFiltrados.map((aviso) => (
-                <div key={aviso.id} onClick={() => setModalAviso(aviso)} className="mural-card-item" style={{ backgroundColor: aviso.fundo, borderColor: aviso.borda }}>
-                  
-                  {/* FITA MARCADORA (RIBBON) */}
+                <div
+                  key={aviso.id}
+                  onClick={() => setModalAviso(aviso)}
+                  className="mural-card-item"
+                  style={{
+                    backgroundColor: 'var(--bg-card, #FFFFFF)',
+                    borderLeftColor: aviso.borda,
+                    borderTopColor: 'var(--border-card, #E2E8F0)',
+                    borderRightColor: 'var(--border-card, #E2E8F0)',
+                    borderBottomColor: 'var(--border-card, #E2E8F0)'
+                  }}
+                >
                   <div style={{
                     position: 'absolute',
                     top: '-12px',
@@ -426,7 +444,6 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
                     zIndex: 10
                   }} />
 
-                  {/* TOPO COM AS BADGES E BOTÃO EXCLUIR */}
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', flexWrap: 'wrap', marginBottom: '14px', paddingRight: '36px' }}>
                       {aviso.badgeStatus.map((b, idx) => (
@@ -444,8 +461,8 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
                           onClick={(e) => handleExcluirAviso(e, aviso.id)}
                           title="Remover comunicado"
                           style={{
-                            background: '#FEE2E2',
-                            color: '#DC2626',
+                            background: 'rgba(239, 68, 68, 0.15)',
+                            color: '#F87171',
                             border: 'none',
                             width: '22px',
                             height: '22px',
@@ -464,44 +481,21 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
                       )}
                     </div>
 
-                    {/* TÍTULO AMPLIADO E CENTRALIZADO */}
-                    <h3 style={{
-                      margin: '0 auto 14px auto',
-                      fontSize: '1.38rem',
-                      fontWeight: '900',
-                      color: 'var(--ev-teal-dark, #004D4C)',
-                      lineHeight: '1.35',
-                      textAlign: 'center',
-                      maxWidth: '94%'
-                    }}>
+                    <h3 style={{ margin: '0 auto 14px auto', fontSize: '1.38rem', fontWeight: '900', color: 'var(--texto-primario)', lineHeight: '1.35', textAlign: 'center', maxWidth: '94%' }}>
                       {aviso.titulo}
                     </h3>
-
-                    {/* CORPO DO TEXTO AMPLIADO E CENTRALIZADO (SEM AS TAGS DE METADADOS EMBAIXO DO TÍTULO) */}
-                    <p style={{
-                      margin: '0 auto',
-                      fontSize: '1.02rem',
-                      color: '#334155',
-                      lineHeight: '1.65',
-                      textAlign: 'center',
-                      maxWidth: '92%'
-                    }}>
+                    <p style={{ margin: '0 auto', fontSize: '1.02rem', color: 'var(--texto-secundario)', lineHeight: '1.65', textAlign: 'center', maxWidth: '92%' }}>
                       {aviso.descricao}
                     </p>
                   </div>
-
-                  {/* RODAPÉ DO CARD */}
-                  <div style={{ marginTop: '22px', paddingTop: '12px', borderTop: '1px dotted rgba(0, 0, 0, 0.15)', textAlign: 'center' }}>
-                    <span style={{ color: 'var(--ev-teal-primary, #006968)', fontSize: '0.86rem', fontWeight: '800' }}>
-                      Clique para ver comunicado completo 🔍
-                    </span>
+                  <div style={{ marginTop: '22px', paddingTop: '12px', borderTop: '1px dotted var(--border-card)', textAlign: 'center' }}>
+                    <span style={{ color: '#2DD4BF', fontSize: '0.86rem', fontWeight: '800' }}>Clique para ver comunicado completo 🔍</span>
                   </div>
                 </div>
               ))
             )}
           </div>
 
-          {/* ILUSTRAÇÃO LATERAL DIREITA: TORRE DE LIVROS EMPILHADOS */}
           <div className="mural-book-decor" style={{ position: 'absolute', right: '-15px', top: '50%', transform: 'translateY(-50%)', width: '150px', pointerEvents: 'none', zIndex: 1 }}>
             <svg width="150" height="260" viewBox="0 0 150 260" fill="none" stroke="#8A7B68" strokeWidth="2.2" strokeLinejoin="round" strokeLinecap="round">
               <g transform="translate(10, 30)">
@@ -559,17 +553,16 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
               </g>
             </svg>
           </div>
-
         </div>
       </div>
 
-      {/* MODAL DETALHES COMPLETO (DATA NO RODAPÉ DO MODAL) */}
+      {/* MODAL DETALHES COMPLETO */}
       {isMounted && modalAviso && createPortal(
         <div
           style={{
             position: 'fixed',
             inset: 0,
-            backgroundColor: 'rgba(0, 30, 30, 0.65)',
+            backgroundColor: 'rgba(0, 20, 20, 0.75)',
             backdropFilter: 'blur(4px)',
             display: 'flex',
             alignItems: 'center',
@@ -580,20 +573,18 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
           onClick={() => setModalAviso(null)}
         >
           <div
-            className="mural-modal-box"
             style={{
-              backgroundColor: modalAviso.fundo,
-              borderColor: modalAviso.borda,
+              backgroundColor: 'var(--bg-card, #FFFFFF)',
+              border: '1px solid var(--border-card, #E2E8F0)',
               borderRadius: '24px',
               padding: '36px',
               width: '100%',
               maxWidth: '620px',
-              boxShadow: '0 25px 50px rgba(0, 0, 0, 0.25)',
+              boxShadow: '0 25px 50px rgba(0, 0, 0, 0.35)',
               position: 'relative'
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* TOPO DO MODAL */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                 {modalAviso.badgeStatus.map((b, idx) => (
@@ -605,38 +596,47 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
                   {modalAviso.tagSetor}
                 </span>
               </div>
-              <button onClick={() => setModalAviso(null)} style={{ background: '#F1F5F9', border: 'none', width: '32px', height: '32px', borderRadius: '50%', cursor: 'pointer', fontWeight: '800' }}>
+              <button
+                onClick={() => setModalAviso(null)}
+                style={{
+                  background: 'var(--border-card)',
+                  color: 'var(--texto-primario)',
+                  border: 'none',
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
+                  cursor: 'pointer',
+                  fontWeight: '800'
+                }}
+              >
                 ✕
               </button>
             </div>
 
-            {/* TÍTULO DO COMUNICADO */}
-            <h2 style={{ margin: '0 0 16px 0', fontSize: '1.5rem', fontWeight: '900', color: 'var(--ev-teal-dark, #004D4C)' }}>
+            <h2 style={{ margin: '0 0 16px 0', fontSize: '1.5rem', fontWeight: '900', color: 'var(--texto-primario)' }}>
               {modalAviso.titulo}
             </h2>
 
-            {/* CONTEÚDO DO TEXTO */}
-            <div style={{ backgroundColor: '#FFFFFF', padding: '22px', borderRadius: '12px', border: '1px solid #E2E8F0', fontSize: '1rem', color: '#334155', lineHeight: '1.7', whiteSpace: 'pre-wrap' }}>
+            <div style={{ backgroundColor: 'var(--bg-subconteudo)', padding: '22px', borderRadius: '12px', border: '1px solid var(--border-card)', fontSize: '1rem', color: 'var(--texto-secundario)', lineHeight: '1.7', whiteSpace: 'pre-wrap' }}>
               {modalAviso.descricao}
             </div>
 
-            {/* DATA DE PUBLICAÇÃO NA PARTE INFERIOR DO MODAL */}
             <div style={{
               marginTop: '18px',
               paddingTop: '16px',
-              borderTop: '1px solid #E2E8F0',
+              borderTop: '1px solid var(--border-card)',
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
               fontSize: '0.84rem',
-              color: '#64748B',
+              color: 'var(--texto-secundario)',
               fontWeight: '600'
             }}>
               <span>🕒 {modalAviso.meta}</span>
               <button
                 onClick={() => setModalAviso(null)}
                 style={{
-                  background: 'var(--ev-teal-primary, #006968)',
+                  background: '#006968',
                   color: '#FFFFFF',
                   border: 'none',
                   padding: '7px 18px',
@@ -671,7 +671,8 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
         >
           <div
             style={{
-              backgroundColor: '#FFFFFF',
+              backgroundColor: 'var(--bg-card, #FFFFFF)',
+              border: '1px solid var(--border-card, #E2E8F0)',
               borderRadius: '24px',
               width: '100%',
               maxWidth: '560px',
@@ -681,34 +682,34 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h3 style={{ margin: 0, fontSize: '1.3rem', fontWeight: '900', color: 'var(--ev-teal-dark, #004D4C)' }}>
+              <h3 style={{ margin: 0, fontSize: '1.3rem', fontWeight: '900', color: 'var(--texto-titulo-verde)' }}>
                 📢 Publicar no Mural Operacional
               </h3>
-              <button onClick={() => setModalPublicar(false)} style={{ background: '#F1F5F9', border: 'none', width: '32px', height: '32px', borderRadius: '50%', cursor: 'pointer', fontWeight: '800' }}>
+              <button onClick={() => setModalPublicar(false)} style={{ background: 'var(--border-card)', color: 'var(--texto-primario)', border: 'none', width: '32px', height: '32px', borderRadius: '50%', cursor: 'pointer', fontWeight: '800' }}>
                 ✕
               </button>
             </div>
 
             <form onSubmit={handleSalvarAviso} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', marginBottom: '6px', color: '#334155' }}>Título do Aviso:</label>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', marginBottom: '6px', color: 'var(--texto-secundario)' }}>Título do Aviso:</label>
                 <input
                   type="text"
                   required
                   placeholder="Ex: Instabilidade no painel dos Correios"
                   value={formNovo.titulo}
                   onChange={(e) => setFormNovo({ ...formNovo, titulo: e.target.value })}
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1.5px solid #CBD5E1', fontSize: '0.92rem', outline: 'none' }}
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1.5px solid var(--border-search, #CBD5E1)', background: 'var(--bg-input, #F8FAFC)', color: 'var(--texto-primario)', fontSize: '0.92rem', outline: 'none' }}
                 />
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', marginBottom: '6px', color: '#334155' }}>Tipo de Alerta:</label>
+                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', marginBottom: '6px', color: 'var(--texto-secundario)' }}>Tipo de Alerta:</label>
                   <select
                     value={formNovo.tipo}
                     onChange={(e) => setFormNovo({ ...formNovo, tipo: e.target.value })}
-                    style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1.5px solid #CBD5E1', fontSize: '0.88rem', background: '#FFF' }}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1.5px solid var(--border-search, #CBD5E1)', background: 'var(--bg-input, #F8FAFC)', color: 'var(--texto-primario)', fontSize: '0.88rem' }}
                   >
                     <option value="urgente">URGENTE</option>
                     <option value="informativo">INFORMATIVO</option>
@@ -716,11 +717,11 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', marginBottom: '6px', color: '#334155' }}>Status Inicial:</label>
+                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', marginBottom: '6px', color: 'var(--texto-secundario)' }}>Status Inicial:</label>
                   <select
                     value={formNovo.statusExtra}
                     onChange={(e) => setFormNovo({ ...formNovo, statusExtra: e.target.value })}
-                    style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1.5px solid #CBD5E1', fontSize: '0.88rem', background: '#FFF' }}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1.5px solid var(--border-search, #CBD5E1)', background: 'var(--bg-input, #F8FAFC)', color: 'var(--texto-primario)', fontSize: '0.88rem' }}
                   >
                     <option value="⏳ EM ANDAMENTO">⏳ EM ANDAMENTO</option>
                     <option value="✓ SOLUCIONADO">✓ SOLUCIONADO</option>
@@ -731,19 +732,19 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
 
               <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '12px', alignItems: 'center' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', marginBottom: '6px', color: '#334155' }}>Setor Responsável:</label>
+                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', marginBottom: '6px', color: 'var(--texto-secundario)' }}>Setor Responsável:</label>
                   <input
                     type="text"
                     required
                     placeholder="Ex: TI/Financeiro, Logística..."
                     value={formNovo.tagSetor}
                     onChange={(e) => setFormNovo({ ...formNovo, tagSetor: e.target.value })}
-                    style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1.5px solid #CBD5E1', fontSize: '0.92rem', outline: 'none' }}
+                    style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1.5px solid var(--border-search, #CBD5E1)', background: 'var(--bg-input, #F8FAFC)', color: 'var(--texto-primario)', fontSize: '0.92rem', outline: 'none' }}
                   />
                 </div>
 
                 <div style={{ paddingTop: '20px' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.84rem', fontWeight: '700', color: '#334155', cursor: 'pointer' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.84rem', fontWeight: '700', color: 'var(--texto-secundario)', cursor: 'pointer' }}>
                     <input
                       type="checkbox"
                       checked={formNovo.fixado}
@@ -756,29 +757,28 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', marginBottom: '6px', color: '#334155' }}>Texto da Orientação:</label>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', marginBottom: '6px', color: 'var(--texto-secundario)' }}>Texto da Orientação:</label>
                 <textarea
                   required
                   rows="5"
                   placeholder="Descreva a orientação operacional para o time..."
                   value={formNovo.descricao}
                   onChange={(e) => setFormNovo({ ...formNovo, descricao: e.target.value })}
-                  style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1.5px solid #CBD5E1', fontSize: '0.9rem', outline: 'none', lineHeight: '1.5' }}
+                  style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1.5px solid var(--border-search, #CBD5E1)', background: 'var(--bg-input, #F8FAFC)', color: 'var(--texto-primario)', fontSize: '0.9rem', outline: 'none', lineHeight: '1.5' }}
                 />
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '8px' }}>
-                <button type="button" onClick={() => setModalPublicar(false)} style={{ padding: '9px 18px', borderRadius: '8px', border: 'none', backgroundColor: '#F1F5F9', color: '#475569', fontWeight: '700', cursor: 'pointer' }}>
+                <button type="button" onClick={() => setModalPublicar(false)} style={{ padding: '9px 18px', borderRadius: '8px', border: '1px solid var(--border-card)', backgroundColor: 'transparent', color: 'var(--texto-secundario)', fontWeight: '700', cursor: 'pointer' }}>
                   Cancelar
                 </button>
-                <button type="submit" style={{ padding: '9px 24px', borderRadius: '8px', border: 'none', backgroundColor: 'var(--ev-teal-primary, #006968)', color: '#FFFFFF', fontWeight: '800', cursor: 'pointer' }}>
+                <button type="submit" style={{ padding: '9px 24px', borderRadius: '8px', border: 'none', backgroundColor: '#006968', color: '#FFFFFF', fontWeight: '800', cursor: 'pointer' }}>
                   Publicar Aviso
                 </button>
               </div>
             </form>
           </div>
-        </div>,
-        document.body
+        </div>
       )}
 
       {/* FEEDBACK TOAST */}
@@ -787,11 +787,11 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
           position: 'fixed',
           bottom: '28px',
           right: '28px',
-          background: toast.tipo === 'erro' ? '#991B1B' : 'var(--ev-teal-dark, #004D4C)',
+          background: toast.tipo === 'erro' ? '#991B1B' : '#004D4C',
           color: '#FFFFFF',
           padding: '13px 24px',
           borderRadius: '9999px',
-          border: `1.5px solid ${toast.tipo === 'erro' ? '#FCA5A5' : 'var(--ev-turquoise, #5EEAD4)'}`,
+          border: `1.5px solid ${toast.tipo === 'erro' ? '#FCA5A5' : '#5EEAD4'}`,
           zIndex: 9999,
           fontWeight: '700',
           fontSize: '0.92rem',

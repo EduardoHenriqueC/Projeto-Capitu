@@ -188,8 +188,24 @@ export default function RegulamentosView({ isSupervisor }) {
   return (
     <div style={{ maxWidth: '1440px', margin: '0 auto', padding: '24px 20px 80px 20px' }}>
       
-      {/* ESTILOS DE TRANSIÇÃO E ANIMAÇÃO */}
+      {/* ESTILOS DE TRANSIÇÃO E ADAPTAÇÃO AO MODO ESCURO */}
       <style>{`
+        :root {
+          --reg-cat-ativa-bg: #E6F4F1;
+          --reg-cat-ativa-border: #004D4C;
+          --reg-cat-ativa-color: #004D4C;
+          --reg-cat-icon-active-bg: #D1EBE7;
+          --reg-topic-hover-bg: #F8FAFC;
+        }
+
+        [data-theme="dark"] {
+          --reg-cat-ativa-bg: rgba(45, 212, 191, 0.12);
+          --reg-cat-ativa-border: #2DD4BF;
+          --reg-cat-ativa-color: #2DD4BF;
+          --reg-cat-icon-active-bg: rgba(45, 212, 191, 0.2);
+          --reg-topic-hover-bg: #162836;
+        }
+
         @keyframes fadeTransicaoSuave {
           from {
             opacity: 0;
@@ -207,17 +223,17 @@ export default function RegulamentosView({ isSupervisor }) {
 
       {/* BARRA DE PESQUISA SUPERIOR */}
       <div style={{
-        background: '#FFFFFF',
+        background: 'var(--bg-search, #FFFFFF)',
         borderRadius: '16px',
         padding: '16px 24px',
-        border: '1.5px solid #E2E8F0',
-        boxShadow: '0 2px 8px rgba(0, 77, 76, 0.04)',
+        border: '1.5px solid var(--border-search, #E2E8F0)',
+        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
         marginBottom: '28px',
         display: 'flex',
         alignItems: 'center',
         gap: '14px'
       }}>
-        <span style={{ fontSize: '1.2rem', color: '#006968' }}>🔍</span>
+        <span style={{ fontSize: '1.2rem', color: 'var(--texto-titulo-verde, #006968)' }}>🔍</span>
         <input
           type="text"
           placeholder="Pesquisar regra, SLA, estorno, MLE, extravio ou procedimento..."
@@ -229,13 +245,14 @@ export default function RegulamentosView({ isSupervisor }) {
             fontSize: '0.98rem',
             width: '100%',
             fontWeight: '500',
-            color: '#1E293B'
+            backgroundColor: 'transparent',
+            color: 'var(--text-search, #1E293B)'
           }}
         />
         {termoBusca && (
           <button
             onClick={() => setTermoBusca('')}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', fontSize: '1rem' }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--texto-secundario, #94A3B8)', fontSize: '1rem' }}
           >
             ✕
           </button>
@@ -266,21 +283,21 @@ export default function RegulamentosView({ isSupervisor }) {
                   borderRadius: '16px',
                   cursor: 'pointer',
                   transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                  backgroundColor: isAtiva ? '#E6F4F1' : '#FFFFFF',
-                  border: isAtiva ? '2px solid #004D4C' : '1.5px solid #E2E8F0',
-                  boxShadow: isAtiva ? '0 4px 14px rgba(0, 77, 76, 0.08)' : '0 1px 3px rgba(0,0,0,0.02)',
+                  backgroundColor: isAtiva ? 'var(--reg-cat-ativa-bg)' : 'var(--bg-card, #FFFFFF)',
+                  border: isAtiva ? '2px solid var(--reg-cat-ativa-border)' : '1.5px solid var(--border-card, #E2E8F0)',
+                  boxShadow: isAtiva ? '0 4px 14px rgba(45, 212, 191, 0.08)' : '0 1px 3px rgba(0,0,0,0.02)',
                   transform: isAtiva ? 'scale(1.01)' : 'scale(1)'
                 }}
                 onMouseEnter={(e) => {
                   if (!isAtiva) {
-                    e.currentTarget.style.backgroundColor = '#F8FAFC';
-                    e.currentTarget.style.borderColor = '#CBD5E1';
+                    e.currentTarget.style.backgroundColor = 'var(--bg-item-aberto, #F8FAFC)';
+                    e.currentTarget.style.borderColor = 'var(--border-search, #CBD5E1)';
                   }
                 }}
                 onMouseLeave={(e) => {
                   if (!isAtiva) {
-                    e.currentTarget.style.backgroundColor = '#FFFFFF';
-                    e.currentTarget.style.borderColor = '#E2E8F0';
+                    e.currentTarget.style.backgroundColor = 'var(--bg-card, #FFFFFF)';
+                    e.currentTarget.style.borderColor = 'var(--border-card, #E2E8F0)';
                   }
                 }}
               >
@@ -288,7 +305,7 @@ export default function RegulamentosView({ isSupervisor }) {
                   width: '38px',
                   height: '38px',
                   borderRadius: '10px',
-                  backgroundColor: isAtiva ? '#D1EBE7' : '#F8FAFC',
+                  backgroundColor: isAtiva ? 'var(--reg-cat-icon-active-bg)' : 'var(--bg-item-aberto, #F8FAFC)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -302,7 +319,7 @@ export default function RegulamentosView({ isSupervisor }) {
                 <span style={{
                   fontSize: '0.92rem',
                   fontWeight: isAtiva ? '800' : '600',
-                  color: isAtiva ? '#004D4C' : '#334155',
+                  color: isAtiva ? 'var(--reg-cat-ativa-color)' : 'var(--texto-primario, #334155)',
                   lineHeight: '1.3'
                 }}>
                   {cat.nome}
@@ -314,9 +331,9 @@ export default function RegulamentosView({ isSupervisor }) {
 
         {/* COLUNA DIREITA: PAINEL DE LEITURA COM TRANSIÇÃO */}
         <main style={{
-          backgroundColor: '#FFFFFF',
+          backgroundColor: 'var(--bg-card, #FFFFFF)',
           borderRadius: '20px',
-          border: '1.5px solid #E2E8F0',
+          border: '1.5px solid var(--border-card, #E2E8F0)',
           padding: '36px',
           boxShadow: '0 2px 10px rgba(0, 0, 0, 0.03)',
           minHeight: '520px'
@@ -324,10 +341,10 @@ export default function RegulamentosView({ isSupervisor }) {
           {/* Cabeçalho do Painel */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
             <div>
-              <h2 style={{ margin: 0, fontSize: '1.65rem', fontWeight: '900', color: '#004D4C' }}>
+              <h2 style={{ margin: 0, fontSize: '1.65rem', fontWeight: '900', color: 'var(--texto-titulo-verde, #004D4C)' }}>
                 {termoBusca ? 'Resultados da Pesquisa' : categoriaAtiva}
               </h2>
-              <p style={{ margin: '6px 0 0 0', color: '#64748B', fontSize: '0.92rem' }}>
+              <p style={{ margin: '6px 0 0 0', color: 'var(--texto-secundario, #64748B)', fontSize: '0.92rem' }}>
                 {termoBusca
                   ? `Mostrando resultados para "${termoBusca}"`
                   : 'Selecione um tópico abaixo para consultar os critérios e instruções oficiais.'}
@@ -358,19 +375,19 @@ export default function RegulamentosView({ isSupervisor }) {
             )}
           </div>
 
-          <hr style={{ border: 'none', borderTop: '1px solid #E2E8F0', margin: '20px 0 24px 0' }} />
+          <hr style={{ border: 'none', borderTop: '1px solid var(--border-card, #E2E8F0)', margin: '20px 0 24px 0' }} />
 
-          {/* Listagem de Tópicos (Com chave de animação na troca de categoria) */}
+          {/* Listagem de Tópicos */}
           {carregando ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: '#64748B', fontWeight: '600' }}>
+            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--texto-secundario, #64748B)', fontWeight: '600' }}>
               Carregando regulamentos...
             </div>
           ) : topicosFiltrados.length === 0 ? (
             <div style={{
               textAlign: 'center',
               padding: '48px 20px',
-              color: '#64748B',
-              border: '1.5px dashed #E2E8F0',
+              color: 'var(--texto-secundario, #64748B)',
+              border: '1.5px dashed var(--border-card, #E2E8F0)',
               borderRadius: '12px'
             }}>
               Nenhum tópico cadastrado para esta categoria ainda.
@@ -388,11 +405,11 @@ export default function RegulamentosView({ isSupervisor }) {
                   <div
                     key={item.id}
                     style={{
-                      border: aberto ? '1.5px solid #006968' : '1.5px solid #E2E8F0',
+                      border: aberto ? '1.5px solid var(--texto-destaque-turquesa, #006968)' : '1.5px solid var(--border-card, #E2E8F0)',
                       borderRadius: '14px',
                       overflow: 'hidden',
                       transition: 'border-color 0.25s ease, box-shadow 0.25s ease',
-                      boxShadow: aberto ? '0 4px 12px rgba(0, 105, 104, 0.06)' : 'none'
+                      boxShadow: aberto ? '0 4px 12px rgba(45, 212, 191, 0.08)' : 'none'
                     }}
                   >
                     {/* Linha do Cabeçalho do Tópico */}
@@ -404,18 +421,18 @@ export default function RegulamentosView({ isSupervisor }) {
                         justifyContent: 'space-between',
                         alignItems: 'center',
                         cursor: 'pointer',
-                        backgroundColor: aberto ? '#F8FAFC' : '#FFFFFF',
+                        backgroundColor: aberto ? 'var(--bg-item-aberto, #F8FAFC)' : 'var(--bg-card, #FFFFFF)',
                         userSelect: 'none',
                         transition: 'background-color 0.2s ease'
                       }}
                       onMouseEnter={(e) => {
-                        if (!aberto) e.currentTarget.style.backgroundColor = '#F8FAFC';
+                        if (!aberto) e.currentTarget.style.backgroundColor = 'var(--reg-topic-hover-bg)';
                       }}
                       onMouseLeave={(e) => {
-                        if (!aberto) e.currentTarget.style.backgroundColor = '#FFFFFF';
+                        if (!aberto) e.currentTarget.style.backgroundColor = 'var(--bg-card, #FFFFFF)';
                       }}
                     >
-                      <span style={{ fontSize: '0.96rem', fontWeight: '700', color: '#1E293B' }}>
+                      <span style={{ fontSize: '0.96rem', fontWeight: '700', color: 'var(--texto-primario, #1E293B)', wordBreak: 'break-word' }}>
                         {item.titulo}
                       </span>
 
@@ -430,7 +447,7 @@ export default function RegulamentosView({ isSupervisor }) {
                                 border: 'none',
                                 cursor: 'pointer',
                                 fontSize: '0.85rem',
-                                color: '#64748B'
+                                color: 'var(--texto-secundario, #64748B)'
                               }}
                             >
                               ✏️
@@ -456,7 +473,7 @@ export default function RegulamentosView({ isSupervisor }) {
 
                         {/* Chevron com rotação animada */}
                         <span style={{
-                          color: '#64748B',
+                          color: 'var(--texto-secundario, #64748B)',
                           fontSize: '1.15rem',
                           fontWeight: '800',
                           display: 'inline-block',
@@ -468,21 +485,23 @@ export default function RegulamentosView({ isSupervisor }) {
                       </div>
                     </div>
 
-                    {/* Bloco Accordion Suave (Grid 0fr -> 1fr) */}
+                    {/* Bloco Accordion Suave */}
                     <div style={{
                       display: 'grid',
                       gridTemplateRows: aberto ? '1fr' : '0fr',
                       transition: 'grid-template-rows 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
-                      borderTop: aberto ? '1px solid #E2E8F0' : '1px solid transparent',
+                      borderTop: aberto ? '1px solid var(--border-card, #E2E8F0)' : '1px solid transparent',
                     }}>
                       <div style={{ minHeight: 0, overflow: 'hidden' }}>
                         <div style={{
                           padding: '20px 24px',
-                          backgroundColor: '#FFFFFF',
+                          backgroundColor: 'var(--bg-subconteudo, #FFFFFF)',
                           lineHeight: '1.7',
-                          color: '#334155',
+                          color: 'var(--texto-secundario, #334155)',
                           fontSize: '0.94rem',
-                          whiteSpace: 'pre-wrap'
+                          whiteSpace: 'pre-wrap',
+                          wordBreak: 'break-word',
+                          overflowWrap: 'anywhere'
                         }}>
                           {item.texto_completo?.replace(/\\n/g, '\n')}
                         </div>
@@ -502,7 +521,7 @@ export default function RegulamentosView({ isSupervisor }) {
         <div style={{
           position: 'fixed',
           inset: 0,
-          backgroundColor: 'rgba(0, 20, 20, 0.65)',
+          backgroundColor: 'rgba(0, 20, 20, 0.7)',
           backdropFilter: 'blur(3px)',
           display: 'flex',
           alignItems: 'center',
@@ -511,20 +530,21 @@ export default function RegulamentosView({ isSupervisor }) {
           padding: '20px'
         }}>
           <div style={{
-            backgroundColor: '#FFFFFF',
+            backgroundColor: 'var(--bg-card, #FFFFFF)',
             borderRadius: '16px',
             width: '100%',
             maxWidth: '620px',
             padding: '30px',
+            border: '1px solid var(--border-card, transparent)',
             boxShadow: '0 20px 40px rgba(0,0,0,0.25)'
           }}>
-            <h3 style={{ margin: '0 0 16px 0', color: '#004D4C', fontSize: '1.25rem', fontWeight: '800' }}>
+            <h3 style={{ margin: '0 0 16px 0', color: 'var(--texto-titulo-verde, #004D4C)', fontSize: '1.25rem', fontWeight: '800' }}>
               {editandoItem ? '✏️ Editar Regulamento' : '➕ Novo Tópico de Regulamento'}
             </h3>
 
             <form onSubmit={handleSalvar} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', marginBottom: '4px', color: '#334155' }}>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', marginBottom: '4px', color: 'var(--texto-secundario, #334155)' }}>
                   Categoria:
                 </label>
                 <input
@@ -537,7 +557,9 @@ export default function RegulamentosView({ isSupervisor }) {
                     width: '100%',
                     padding: '10px 12px',
                     borderRadius: '8px',
-                    border: '1.5px solid #CBD5E1',
+                    border: '1.5px solid var(--border-search, #CBD5E1)',
+                    background: 'var(--bg-input, #FFF)',
+                    color: 'var(--texto-primario, #1E293B)',
                     fontSize: '0.92rem',
                     outline: 'none'
                   }}
@@ -545,7 +567,7 @@ export default function RegulamentosView({ isSupervisor }) {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', marginBottom: '4px', color: '#334155' }}>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', marginBottom: '4px', color: 'var(--texto-secundario, #334155)' }}>
                   Título do Tópico:
                 </label>
                 <input
@@ -558,7 +580,9 @@ export default function RegulamentosView({ isSupervisor }) {
                     width: '100%',
                     padding: '10px 12px',
                     borderRadius: '8px',
-                    border: '1.5px solid #CBD5E1',
+                    border: '1.5px solid var(--border-search, #CBD5E1)',
+                    background: 'var(--bg-input, #FFF)',
+                    color: 'var(--texto-primario, #1E293B)',
                     fontSize: '0.92rem',
                     outline: 'none'
                   }}
@@ -566,7 +590,7 @@ export default function RegulamentosView({ isSupervisor }) {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', marginBottom: '4px', color: '#334155' }}>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', marginBottom: '4px', color: 'var(--texto-secundario, #334155)' }}>
                   Texto Completo da Instrução:
                 </label>
                 <textarea
@@ -579,7 +603,9 @@ export default function RegulamentosView({ isSupervisor }) {
                     width: '100%',
                     padding: '12px',
                     borderRadius: '8px',
-                    border: '1.5px solid #CBD5E1',
+                    border: '1.5px solid var(--border-search, #CBD5E1)',
+                    background: 'var(--bg-input, #FFF)',
+                    color: 'var(--texto-primario, #1E293B)',
                     fontSize: '0.9rem',
                     lineHeight: '1.6',
                     outline: 'none',
@@ -595,9 +621,9 @@ export default function RegulamentosView({ isSupervisor }) {
                   style={{
                     padding: '9px 18px',
                     borderRadius: '8px',
-                    border: '1px solid #CBD5E1',
-                    background: '#FFFFFF',
-                    color: '#64748B',
+                    border: '1px solid var(--border-card, #CBD5E1)',
+                    background: 'transparent',
+                    color: 'var(--texto-secundario, #64748B)',
                     fontWeight: '700',
                     cursor: 'pointer'
                   }}
@@ -631,7 +657,7 @@ export default function RegulamentosView({ isSupervisor }) {
         <div style={{
           position: 'fixed',
           inset: 0,
-          backgroundColor: 'rgba(0, 20, 20, 0.65)',
+          backgroundColor: 'rgba(0, 20, 20, 0.7)',
           backdropFilter: 'blur(3px)',
           display: 'flex',
           alignItems: 'center',
@@ -640,18 +666,19 @@ export default function RegulamentosView({ isSupervisor }) {
           padding: '20px'
         }}>
           <div style={{
-            background: '#FFFFFF',
+            background: 'var(--bg-card, #FFFFFF)',
             borderRadius: '16px',
             width: '100%',
             maxWidth: '420px',
             padding: '26px',
+            border: '1px solid var(--border-card, transparent)',
             textAlign: 'center',
             boxShadow: '0 20px 40px rgba(0, 0, 0, 0.25)'
           }}>
-            <h3 style={{ margin: '0 0 8px 0', color: '#0F172A', fontSize: '1.15rem', fontWeight: '800' }}>
+            <h3 style={{ margin: '0 0 8px 0', color: 'var(--texto-primario, #0F172A)', fontSize: '1.15rem', fontWeight: '800' }}>
               Remover Tópico?
             </h3>
-            <p style={{ margin: '0 0 20px 0', color: '#64748B', fontSize: '0.88rem', lineHeight: '1.5' }}>
+            <p style={{ margin: '0 0 20px 0', color: 'var(--texto-secundario, #64748B)', fontSize: '0.88rem', lineHeight: '1.5' }}>
               Deseja remover <strong>"{itemParaExcluir.titulo}"</strong>? Esta instrução será apagada definitivamente do banco.
             </p>
             <div style={{ display: 'flex', justifyContent: 'center', gap: '10px' }}>
@@ -661,9 +688,9 @@ export default function RegulamentosView({ isSupervisor }) {
                 style={{
                   padding: '9px 18px',
                   borderRadius: '8px',
-                  border: '1px solid #CBD5E1',
-                  background: '#FFFFFF',
-                  color: '#475569',
+                  border: '1px solid var(--border-card, #CBD5E1)',
+                  background: 'transparent',
+                  color: 'var(--texto-secundario, #475569)',
                   fontWeight: '700',
                   cursor: 'pointer'
                 }}
@@ -677,7 +704,7 @@ export default function RegulamentosView({ isSupervisor }) {
                   padding: '9px 20px',
                   borderRadius: '8px',
                   border: 'none',
-                  background: '#0F172A',
+                  background: '#DC2626',
                   color: '#FFFFFF',
                   fontWeight: '700',
                   cursor: 'pointer'
@@ -696,11 +723,11 @@ export default function RegulamentosView({ isSupervisor }) {
           position: 'fixed',
           bottom: '28px',
           right: '28px',
-          background: '#004D4C',
+          background: toast.tipo === 'erro' ? '#991B1B' : '#004D4C',
           color: '#FFFFFF',
           padding: '12px 22px',
           borderRadius: '9999px',
-          border: '1.5px solid #5EEAD4',
+          border: `1.5px solid ${toast.tipo === 'erro' ? '#FCA5A5' : '#5EEAD4'}`,
           zIndex: 9999,
           fontWeight: '700',
           fontSize: '0.9rem',

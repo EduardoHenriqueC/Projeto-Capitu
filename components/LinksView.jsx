@@ -49,41 +49,74 @@ export default function LinksView() {
     { id: 22, titulo: 'Central de Encantamento', desc: 'Registro de cases de atendimento', url: 'https://casesmagazineluiza.zendesk.com/hc/pt-br', icone: '🧡'},
   ];
 
-  const cardStyle = (item) => ({
-    display: 'block',
-    textDecoration: 'none',
-    backgroundColor: '#D6EFEA', // Tom de verde mais presente e saturado
-    border: item.destaque ? '2.5px solid var(--ev-amber)' : '2px solid #5EBFA8', // Borda nítida em verde-turquesa
-    borderRadius: '16px',
-    padding: '22px',
-    boxShadow: item.destaque ? '0 6px 18px rgba(255, 152, 0, 0.2)' : '0 4px 12px rgba(0, 77, 76, 0.08)',
-    transition: 'all 0.22s cubic-bezier(0.16, 1, 0.3, 1)',
-    position: 'relative'
-  });
-
-  const handleMouseEnter = (e, item) => {
-    e.currentTarget.style.transform = 'translateY(-4px)';
-    e.currentTarget.style.backgroundColor = '#C2E7E0'; // Verde mais intenso no hover
-    e.currentTarget.style.boxShadow = '0 10px 24px rgba(0, 77, 76, 0.16)';
-    if (!item.destaque) e.currentTarget.style.borderColor = 'var(--ev-teal-dark)';
-  };
-
-  const handleMouseLeave = (e, item) => {
-    e.currentTarget.style.transform = 'translateY(0)';
-    e.currentTarget.style.backgroundColor = '#D6EFEA';
-    e.currentTarget.style.boxShadow = item.destaque ? '0 6px 18px rgba(255, 152, 0, 0.2)' : '0 4px 12px rgba(0, 77, 76, 0.08)';
-    if (!item.destaque) e.currentTarget.style.borderColor = '#5EBFA8';
-  };
-
   return (
     <div style={{ maxWidth: '1240px', margin: '0 auto', padding: '36px 20px 80px 20px' }}>
       
+      {/* VARIÁVEIS DE CORES E HOVER NATIVO (Sem Javascript inline) */}
+      <style>{`
+        :root {
+          /* Cores Originais do Modo Claro (Verdes Saturados) */
+          --link-card-bg: #D6EFEA;
+          --link-card-hover: #C2E7E0;
+          --link-border: #5EBFA8;
+          --link-border-hover: #004D4C;
+          --link-title: #003635;
+          --link-desc: #1B423F;
+          --link-icon-bg: #FFFFFF;
+          --link-icon-border: rgba(94, 191, 168, 0.3);
+          --link-shadow: 0 4px 12px rgba(0, 77, 76, 0.08);
+          --link-shadow-hover: 0 10px 24px rgba(0, 77, 76, 0.16);
+        }
+
+        [data-theme="dark"] {
+          /* Adaptação Elegante para o Modo Escuro */
+          --link-card-bg: #13222D;
+          --link-card-hover: #1A2F3D;
+          --link-border: #1E3545;
+          --link-border-hover: #2DD4BF;
+          --link-title: #F8FAFC;
+          --link-desc: #94A3B8;
+          --link-icon-bg: #0F1A22;
+          --link-icon-border: #1E3545;
+          --link-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+          --link-shadow-hover: 0 10px 24px rgba(0, 0, 0, 0.4);
+        }
+
+        .card-link-item {
+          display: block;
+          text-decoration: none;
+          background-color: var(--link-card-bg);
+          border: 2px solid var(--link-border);
+          border-radius: 16px;
+          padding: 22px;
+          box-shadow: var(--link-shadow);
+          transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+          position: relative;
+        }
+
+        .card-link-item:hover {
+          transform: translateY(-4px);
+          background-color: var(--link-card-hover);
+          border-color: var(--link-border-hover);
+          box-shadow: var(--link-shadow-hover);
+        }
+
+        /* Regra Especial para Cards em Destaque */
+        .card-link-item.destaque {
+          border: 2.5px solid #F59E0B;
+          box-shadow: 0 6px 18px rgba(245, 158, 11, 0.15);
+        }
+        .card-link-item.destaque:hover {
+          border-color: #F59E0B; /* Mantém laranja no hover */
+        }
+      `}</style>
+
       {/* CABEÇALHO */}
-      <div style={{ borderBottom: '2px solid #CBD5E1', paddingBottom: '24px', marginBottom: '32px' }}>
-        <h2 style={{ fontSize: '1.8rem', fontWeight: '800', color: 'var(--ev-teal-dark)', margin: '0 0 8px 0' }}>
+      <div style={{ borderBottom: '2px solid var(--border-search, #CBD5E1)', paddingBottom: '24px', marginBottom: '32px' }}>
+        <h2 style={{ fontSize: '1.8rem', fontWeight: '800', color: 'var(--texto-titulo-verde, #004D4C)', margin: '0 0 8px 0' }}>
           🔗 Diretório de Links Úteis
         </h2>
-        <p style={{ margin: 0, fontSize: '1rem', color: 'var(--text-muted)' }}>
+        <p style={{ margin: 0, fontSize: '1rem', color: 'var(--texto-secundario, #64748B)' }}>
           Central de links diretos, formulários de apoio, sistemas e planilhas essenciais da operação.
         </p>
       </div>
@@ -92,7 +125,7 @@ export default function LinksView() {
       <div style={{ marginBottom: '48px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
           <span style={{ fontSize: '1.4rem' }}>📊</span>
-          <h3 style={{ fontSize: '1.25rem', color: 'var(--ev-teal-dark)', fontWeight: '800', margin: 0 }}>
+          <h3 style={{ fontSize: '1.25rem', color: 'var(--texto-primario, #1E293B)', fontWeight: '800', margin: 0 }}>
             Planilhas Operacionais da Equipe
           </h3>
         </div>
@@ -104,14 +137,12 @@ export default function LinksView() {
               href={item.url}
               target="_blank"
               rel="noopener noreferrer"
-              style={cardStyle(item)}
-              onMouseEnter={(e) => handleMouseEnter(e, item)}
-              onMouseLeave={(e) => handleMouseLeave(e, item)}
+              className={`card-link-item ${item.destaque ? 'destaque' : ''}`}
             >
               {item.destaque && (
                 <div style={{
                   position: 'absolute', top: '-11px', right: '18px',
-                  background: 'var(--ev-amber)', color: '#FFF',
+                  background: '#F59E0B', color: '#FFF',
                   fontSize: '0.68rem', fontWeight: '800', padding: '3px 10px',
                   borderRadius: '9999px', letterSpacing: '0.5px'
                 }}>
@@ -124,23 +155,23 @@ export default function LinksView() {
                   width: '46px',
                   height: '46px',
                   borderRadius: '12px',
-                  backgroundColor: '#FFFFFF',
+                  backgroundColor: 'var(--link-icon-bg)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   fontSize: '1.45rem',
-                  boxShadow: '0 2px 8px rgba(0, 77, 76, 0.12)',
-                  border: '1px solid rgba(94, 191, 168, 0.3)'
+                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
+                  border: '1px solid var(--link-icon-border)'
                 }}>
                   {item.icone}
                 </div>
-                <span style={{ color: 'var(--ev-teal-dark)', fontSize: '1.15rem', fontWeight: '800' }}>↗</span>
+                <span style={{ color: '#2DD4BF', fontSize: '1.15rem', fontWeight: '800' }}>↗</span>
               </div>
 
-              <h4 style={{ margin: '0 0 8px 0', fontSize: '1.02rem', color: '#003635', fontWeight: '800' }}>
+              <h4 style={{ margin: '0 0 8px 0', fontSize: '1.02rem', color: 'var(--link-title)', fontWeight: '800' }}>
                 {item.titulo}
               </h4>
-              <p style={{ margin: 0, fontSize: '0.86rem', color: '#1B423F', lineHeight: '1.5', fontWeight: '600' }}>
+              <p style={{ margin: 0, fontSize: '0.86rem', color: 'var(--link-desc)', lineHeight: '1.5', fontWeight: '600' }}>
                 {item.desc}
               </p>
             </a>
@@ -152,7 +183,7 @@ export default function LinksView() {
       <div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
           <span style={{ fontSize: '1.4rem' }}>🌐</span>
-          <h3 style={{ fontSize: '1.25rem', color: 'var(--ev-teal-dark)', fontWeight: '800', margin: 0 }}>
+          <h3 style={{ fontSize: '1.25rem', color: 'var(--texto-primario, #1E293B)', fontWeight: '800', margin: 0 }}>
             Links e Formas de Apoio Externo
           </h3>
         </div>
@@ -164,32 +195,30 @@ export default function LinksView() {
               href={item.url}
               target="_blank"
               rel="noopener noreferrer"
-              style={cardStyle(item)}
-              onMouseEnter={(e) => handleMouseEnter(e, item)}
-              onMouseLeave={(e) => handleMouseLeave(e, item)}
+              className="card-link-item"
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
                 <div style={{
                   width: '46px',
                   height: '46px',
                   borderRadius: '12px',
-                  backgroundColor: '#FFFFFF',
+                  backgroundColor: 'var(--link-icon-bg)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   fontSize: '1.45rem',
-                  boxShadow: '0 2px 8px rgba(0, 77, 76, 0.12)',
-                  border: '1px solid rgba(94, 191, 168, 0.3)'
+                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
+                  border: '1px solid var(--link-icon-border)'
                 }}>
                   {item.icone}
                 </div>
-                <span style={{ color: 'var(--ev-teal-dark)', fontSize: '1.15rem', fontWeight: '800' }}>↗</span>
+                <span style={{ color: '#2DD4BF', fontSize: '1.15rem', fontWeight: '800' }}>↗</span>
               </div>
 
-              <h4 style={{ margin: '0 0 8px 0', fontSize: '1.02rem', color: '#003635', fontWeight: '800' }}>
+              <h4 style={{ margin: '0 0 8px 0', fontSize: '1.02rem', color: 'var(--link-title)', fontWeight: '800' }}>
                 {item.titulo}
               </h4>
-              <p style={{ margin: 0, fontSize: '0.86rem', color: '#1B423F', lineHeight: '1.5', fontWeight: '600' }}>
+              <p style={{ margin: 0, fontSize: '0.86rem', color: 'var(--link-desc)', lineHeight: '1.5', fontWeight: '600' }}>
                 {item.desc}
               </p>
             </a>
