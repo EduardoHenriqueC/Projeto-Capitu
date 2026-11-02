@@ -286,6 +286,10 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
   const [iconeEditando, setIconeEditando] = useState('');
   const salvandoCatRef = useRef(false);
 
+  // Controle de Drag and Drop (Arrastar e Soltar)
+  const dragItemRef = useRef(null);
+  const [itemArrastandoId, setItemArrastandoId] = useState(null);
+
   // Toast
   const [toast, setToast] = useState({ visivel: false, mensagem: '', tipo: 'sucesso' });
   
@@ -338,16 +342,25 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
     return { bg: '#FFFFFF', border: '#CBD5E1' };
   };
 
-  // 1. CARREGAMENTO
+  // 1. CARREGAMENTO COM ORDENAÇÃO DINÂMICA
   const buscarCategorias = async () => {
     try {
       const { data, error } = await supabase
         .from('categorias_colinhas')
         .select('*')
+        .order('ordem', { ascending: true })
         .order('id', { ascending: true });
 
-      if (error) throw error;
-      if (data) setCategorias(data);
+      if (error) {
+        // Fallback caso a coluna ordem ainda não exista no schema
+        const { data: fallbackData } = await supabase
+          .from('categorias_colinhas')
+          .select('*')
+          .order('id', { ascending: true });
+        if (fallbackData) setCategorias(fallbackData);
+      } else if (data) {
+        setCategorias(data);
+      }
     } catch (err) {
       console.error('Erro ao buscar categorias:', err);
     }
@@ -669,7 +682,8 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
       const nova = {
         nome: formCat.nome.trim(),
         icone: formCat.icone.trim() || '📁',
-        parent_id: formCat.tipo === 'subcategoria' ? Number(formCat.parentId) : null
+        parent_id: formCat.tipo === 'subcategoria' ? Number(formCat.parentId) : null,
+        ordem: categorias.length + 1
       };
 
       const { error } = await supabase.from('categorias_colinhas').insert([nova]);
@@ -927,7 +941,66 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
               : isSubAtivaDestePai;
 
             return (
-              <div key={cat.id} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+              <div
+                key={cat.id}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '2px',
+                  opacity: itemArrastandoId === cat.id ? 0.4 : 1,
+                  transition: 'opacity 0.15s ease'
+                }}
+                draggable={isSupervisor && editandoCatId !== cat.id}
+                onDragStart={(e) => {
+                  dragItemRef.current = { id: cat.id, tipo: 'principal' };
+                  setItemArrastandoId(cat.id);
+                  e.dataTransfer.effectAllowed = 'move';
+                }}
+                onDragOver={(e) => {
+                  if (isSupervisor && dragItemRef.current?.tipo === 'principal') {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                  }
+                }}
+                onDragEnd={() => {
+                  dragItemRef.current = null;
+                  setItemArrastandoId(null);
+                }}
+                onDrop={async (e) => {
+                  e.preventDefault();
+                  if (!isSupervisor) return;
+                  const dragData = dragItemRef.current;
+                  if (!dragData || dragData.tipo !== 'principal' || dragData.id === cat.id) return;
+
+                  const sourceIdx = categoriasPrincipais.findIndex((c) => c.id === dragData.id);
+                  const targetIdx = categoriasPrincipais.findIndex((c) => c.id === cat.id);
+                  if (sourceIdx === -1 || targetIdx === -1) return;
+
+                  const novasPrincipais = [...categoriasPrincipais];
+                  const [removido] = novasPrincipais.splice(sourceIdx, 1);
+                  novasPrincipais.splice(targetIdx, 0, removido);
+
+                  // Atualização otimista imediata na memória
+                  setCategorias((prev) => {
+                    const subs = prev.filter((c) => Boolean(c.parent_id));
+                    const reordenadas = novasPrincipais.map((c, idx) => ({ ...c, ordem: idx }));
+                    return [...reordenadas, ...subs];
+                  });
+
+                  // Persistência em lote no banco
+                  try {
+                    const updates = novasPrincipais.map((c, idx) =>
+                      supabase.from('categorias_colinhas').update({ ordem: idx }).eq('id', c.id)
+                    );
+                    await Promise.all(updates);
+                    dispararToast('Posição das categorias atualizada!', 'sucesso');
+                  } catch (err) {
+                    console.error('Erro ao salvar nova ordem:', err);
+                    dispararToast('Erro ao salvar ordem no banco.', 'erro');
+                    await buscarCategorias();
+                  }
+                }}
+              >
                 <div
                   onClick={() => {
                     if (isAtiva && subs.length > 0) {
@@ -946,11 +1019,21 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
                     border: isAtiva ? '2px solid var(--texto-destaque-turquesa, #006968)' : '1px solid transparent',
                     background: isAtiva ? 'rgba(45, 212, 191, 0.12)' : 'transparent',
                     color: isAtiva ? 'var(--texto-destaque-turquesa, #006968)' : 'var(--texto-primario, #334155)',
-                    cursor: 'pointer',
+                    cursor: isSupervisor && editandoCatId !== cat.id ? 'grab' : 'pointer',
                     transition: 'background-color 0.15s ease'
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flex: 1 }}>
+                    {/* Indicador sutil de arrastar para supervisores */}
+                    {isSupervisor && editandoCatId !== cat.id && (
+                      <span
+                        title="Segure e arraste para reposicionar"
+                        style={{ color: 'var(--texto-secundario, #94A3B8)', fontSize: '0.85rem', cursor: 'grab', userSelect: 'none', opacity: 0.6 }}
+                      >
+                        ⠿
+                      </span>
+                    )}
+
                     {/* EDIÇÃO INLINE: ÍCONE + NOME DA CATEGORIA PRINCIPAL */}
                     {editandoCatId === cat.id ? (
                       <div
@@ -1108,149 +1191,224 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
                       return (
                         <div
                           key={sub.id}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setExpandidas((prev) => ({ ...prev, [cat.id]: true }));
-                            setFiltroAtivo({ tipo: 'subcategoria', id: sub.id, nome: sub.nome, parentId: cat.id });
-                          }}
                           style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            padding: '6px 10px',
-                            borderRadius: '8px',
-                            background: isSubAtiva ? 'rgba(45, 212, 191, 0.12)' : 'transparent',
-                            color: isSubAtiva ? 'var(--texto-destaque-turquesa, #0F766E)' : 'var(--texto-secundario, #64748B)',
-                            fontWeight: isSubAtiva ? '800' : '600',
-                            fontSize: '0.82rem',
-                            cursor: 'pointer'
+                            opacity: itemArrastandoId === sub.id ? 0.4 : 1,
+                            transition: 'opacity 0.15s ease'
+                          }}
+                          draggable={isSupervisor && editandoCatId !== sub.id}
+                          onDragStart={(e) => {
+                            e.stopPropagation();
+                            dragItemRef.current = { id: sub.id, tipo: 'subcategoria', parentId: cat.id };
+                            setItemArrastandoId(sub.id);
+                            e.dataTransfer.effectAllowed = 'move';
+                          }}
+                          onDragOver={(e) => {
+                            if (isSupervisor && dragItemRef.current?.tipo === 'subcategoria' && dragItemRef.current?.parentId === cat.id) {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              e.dataTransfer.dropEffect = 'move';
+                            }
+                          }}
+                          onDragEnd={(e) => {
+                            e.stopPropagation();
+                            dragItemRef.current = null;
+                            setItemArrastandoId(null);
+                          }}
+                          onDrop={async (e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (!isSupervisor) return;
+                            const dragData = dragItemRef.current;
+                            if (!dragData || dragData.tipo !== 'subcategoria' || dragData.parentId !== cat.id || dragData.id === sub.id) return;
+
+                            const subsDestePai = subcategoriasPorPai[cat.id] || [];
+                            const sourceIdx = subsDestePai.findIndex((s) => s.id === dragData.id);
+                            const targetIdx = subsDestePai.findIndex((s) => s.id === sub.id);
+                            if (sourceIdx === -1 || targetIdx === -1) return;
+
+                            const novasSubs = [...subsDestePai];
+                            const [removido] = novasSubs.splice(sourceIdx, 1);
+                            novasSubs.splice(targetIdx, 0, removido);
+
+                            // Atualização otimista
+                            setCategorias((prev) =>
+                              prev.map((c) => {
+                                const idx = novasSubs.findIndex((ns) => ns.id === c.id);
+                                if (idx !== -1) {
+                                  return { ...c, ordem: idx };
+                                }
+                                return c;
+                              })
+                            );
+
+                            // Persistência em lote no banco
+                            try {
+                              const updates = novasSubs.map((s, idx) =>
+                                supabase.from('categorias_colinhas').update({ ordem: idx }).eq('id', s.id)
+                              );
+                              await Promise.all(updates);
+                              dispararToast('Posição das subcategorias atualizada!', 'sucesso');
+                            } catch (err) {
+                              console.error('Erro ao salvar ordem de subcategorias:', err);
+                              dispararToast('Erro ao salvar ordem no banco.', 'erro');
+                              await buscarCategorias();
+                            }
                           }}
                         >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden', flex: 1 }}>
-                            {/* EDIÇÃO INLINE: ÍCONE + NOME DA SUBCATEGORIA */}
-                            {editandoCatId === sub.id ? (
-                              <div
-                                style={{ display: 'flex', alignItems: 'center', gap: '4px', flex: 1, minWidth: 0 }}
-                                onClick={(e) => e.stopPropagation()}
-                                onBlur={(e) => {
-                                  if (!e.currentTarget.contains(e.relatedTarget)) {
-                                    salvarEdicaoCategoria(sub, 'subcategoria');
-                                  }
-                                }}
-                              >
-                                <input
-                                  type="text"
-                                  value={iconeEditando}
-                                  onChange={(e) => setIconeEditando(e.target.value)}
-                                  maxLength={4}
-                                  title="Ícone / Emoji da subcategoria"
-                                  style={{
-                                    width: '32px',
-                                    textAlign: 'center',
-                                    background: 'var(--bg-input, #FFF)',
-                                    color: 'var(--texto-primario, #1E293B)',
-                                    border: '1.5px solid #2DD4BF',
-                                    borderRadius: '6px',
-                                    padding: '1px',
-                                    fontSize: '0.9rem',
-                                    outline: 'none',
-                                    flexShrink: 0
-                                  }}
-                                />
-                                <input
-                                  type="text"
-                                  value={nomeEditando}
-                                  onChange={(e) => setNomeEditando(e.target.value)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                      e.preventDefault();
+                          <div
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setExpandidas((prev) => ({ ...prev, [cat.id]: true }));
+                              setFiltroAtivo({ tipo: 'subcategoria', id: sub.id, nome: sub.nome, parentId: cat.id });
+                            }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '6px 10px',
+                              borderRadius: '8px',
+                              background: isSubAtiva ? 'rgba(45, 212, 191, 0.12)' : 'transparent',
+                              color: isSubAtiva ? 'var(--texto-destaque-turquesa, #0F766E)' : 'var(--texto-secundario, #64748B)',
+                              fontWeight: isSubAtiva ? '800' : '600',
+                              fontSize: '0.82rem',
+                              cursor: isSupervisor && editandoCatId !== sub.id ? 'grab' : 'pointer'
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden', flex: 1 }}>
+                              {isSupervisor && editandoCatId !== sub.id && (
+                                <span
+                                  title="Segure e arraste para reposicionar"
+                                  style={{ color: 'var(--texto-secundario, #94A3B8)', fontSize: '0.75rem', cursor: 'grab', userSelect: 'none', opacity: 0.6 }}
+                                >
+                                  ⠿
+                                </span>
+                              )}
+
+                              {/* EDIÇÃO INLINE: ÍCONE + NOME DA SUBCATEGORIA */}
+                              {editandoCatId === sub.id ? (
+                                <div
+                                  style={{ display: 'flex', alignItems: 'center', gap: '4px', flex: 1, minWidth: 0 }}
+                                  onClick={(e) => e.stopPropagation()}
+                                  onBlur={(e) => {
+                                    if (!e.currentTarget.contains(e.relatedTarget)) {
                                       salvarEdicaoCategoria(sub, 'subcategoria');
-                                    } else if (e.key === 'Escape') {
-                                      cancelarEdicao();
                                     }
                                   }}
-                                  autoFocus
-                                  style={{
-                                    background: 'var(--bg-input, #FFF)',
-                                    color: 'var(--texto-primario, #1E293B)',
-                                    border: '1.5px solid #2DD4BF',
-                                    borderRadius: '6px',
-                                    padding: '2px 6px',
-                                    fontSize: '0.82rem',
-                                    fontWeight: '700',
-                                    outline: 'none',
-                                    flex: 1,
-                                    minWidth: '50px'
-                                  }}
-                                />
-                                <button
-                                  onClick={() => salvarEdicaoCategoria(sub, 'subcategoria')}
-                                  title="Salvar alteração"
-                                  style={{
-                                    background: '#006968',
-                                    color: '#FFF',
-                                    border: 'none',
-                                    borderRadius: '4px',
-                                    padding: '2px 5px',
-                                    cursor: 'pointer',
-                                    fontSize: '0.72rem',
-                                    flexShrink: 0
-                                  }}
                                 >
-                                  ✓
+                                  <input
+                                    type="text"
+                                    value={iconeEditando}
+                                    onChange={(e) => setIconeEditando(e.target.value)}
+                                    maxLength={4}
+                                    title="Ícone / Emoji da subcategoria"
+                                    style={{
+                                      width: '32px',
+                                      textAlign: 'center',
+                                      background: 'var(--bg-input, #FFF)',
+                                      color: 'var(--texto-primario, #1E293B)',
+                                      border: '1.5px solid #2DD4BF',
+                                      borderRadius: '6px',
+                                      padding: '1px',
+                                      fontSize: '0.9rem',
+                                      outline: 'none',
+                                      flexShrink: 0
+                                    }}
+                                  />
+                                  <input
+                                    type="text"
+                                    value={nomeEditando}
+                                    onChange={(e) => setNomeEditando(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        salvarEdicaoCategoria(sub, 'subcategoria');
+                                      } else if (e.key === 'Escape') {
+                                        cancelarEdicao();
+                                      }
+                                    }}
+                                    autoFocus
+                                    style={{
+                                      background: 'var(--bg-input, #FFF)',
+                                      color: 'var(--texto-primario, #1E293B)',
+                                      border: '1.5px solid #2DD4BF',
+                                      borderRadius: '6px',
+                                      padding: '2px 6px',
+                                      fontSize: '0.82rem',
+                                      fontWeight: '700',
+                                      outline: 'none',
+                                      flex: 1,
+                                      minWidth: '50px'
+                                    }}
+                                  />
+                                  <button
+                                    onClick={() => salvarEdicaoCategoria(sub, 'subcategoria')}
+                                    title="Salvar alteração"
+                                    style={{
+                                      background: '#006968',
+                                      color: '#FFF',
+                                      border: 'none',
+                                      borderRadius: '4px',
+                                      padding: '2px 5px',
+                                      cursor: 'pointer',
+                                      fontSize: '0.72rem',
+                                      flexShrink: 0
+                                    }}
+                                  >
+                                    ✓
+                                  </button>
+                                </div>
+                              ) : (
+                                <>
+                                  <span style={{ flexShrink: 0 }}>{sub.icone || '↳'}</span>
+                                  <span
+                                    onDoubleClick={(e) => {
+                                      if (isSupervisor) iniciarEdicao(e, sub);
+                                    }}
+                                    title={isSupervisor ? 'Dê duplo clique ou clique no lápis para editar ícone e nome' : ''}
+                                    style={{ whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}
+                                  >
+                                    {sub.nome}
+                                  </span>
+                                </>
+                              )}
+                            </div>
+
+                            {isSupervisor && editandoCatId !== sub.id && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '2px', flexShrink: 0 }}>
+                                <button
+                                  onClick={(e) => iniciarEdicao(e, sub)}
+                                  title="Editar ícone e nome"
+                                  style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    color: 'var(--texto-secundario, #94A3B8)',
+                                    fontSize: '0.72rem'
+                                  }}
+                                  onMouseEnter={(e) => (e.currentTarget.style.color = '#2DD4BF')}
+                                  onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--texto-secundario, #94A3B8)')}
+                                >
+                                  ✏️
+                                </button>
+
+                                <button
+                                  onClick={(e) => excluirCategoria(e, sub.id, sub.nome)}
+                                  title="Excluir subcategoria"
+                                  style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    color: 'var(--texto-secundario, #94A3B8)',
+                                    fontSize: '0.72rem'
+                                  }}
+                                  onMouseEnter={(e) => (e.currentTarget.style.color = '#DC2626')}
+                                  onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--texto-secundario, #94A3B8)')}
+                                >
+                                  ✕
                                 </button>
                               </div>
-                            ) : (
-                              <>
-                                <span style={{ flexShrink: 0 }}>{sub.icone || '↳'}</span>
-                                <span
-                                  onDoubleClick={(e) => {
-                                    if (isSupervisor) iniciarEdicao(e, sub);
-                                  }}
-                                  title={isSupervisor ? 'Dê duplo clique ou clique no lápis para editar ícone e nome' : ''}
-                                  style={{ whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}
-                                >
-                                  {sub.nome}
-                                </span>
-                              </>
                             )}
                           </div>
-
-                          {isSupervisor && editandoCatId !== sub.id && (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '2px', flexShrink: 0 }}>
-                              <button
-                                onClick={(e) => iniciarEdicao(e, sub)}
-                                title="Editar ícone e nome"
-                                style={{
-                                  background: 'none',
-                                  border: 'none',
-                                  cursor: 'pointer',
-                                  color: 'var(--texto-secundario, #94A3B8)',
-                                  fontSize: '0.72rem'
-                                }}
-                                onMouseEnter={(e) => (e.currentTarget.style.color = '#2DD4BF')}
-                                onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--texto-secundario, #94A3B8)')}
-                              >
-                                ✏️
-                              </button>
-
-                              <button
-                                onClick={(e) => excluirCategoria(e, sub.id, sub.nome)}
-                                title="Excluir subcategoria"
-                                style={{
-                                  background: 'none',
-                                  border: 'none',
-                                  cursor: 'pointer',
-                                  color: 'var(--texto-secundario, #94A3B8)',
-                                  fontSize: '0.72rem'
-                                }}
-                                onMouseEnter={(e) => (e.currentTarget.style.color = '#DC2626')}
-                                onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--texto-secundario, #94A3B8)')}
-                              >
-                                ✕
-                              </button>
-                            </div>
-                          )}
                         </div>
                       );
                     })}

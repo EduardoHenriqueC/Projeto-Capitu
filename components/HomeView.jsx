@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
 
@@ -31,13 +31,12 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
     setTimeout(() => setToast({ visivel: false, mensagem: '', tipo: 'sucesso' }), 2800);
   };
 
-  // FECHAMENTO INTELIGENTE: Só fecha ao clicar genuinamente fora da área de reações
   useEffect(() => {
     setIsMounted(true);
 
     const handleClickFora = (e) => {
       if (e.target.closest && e.target.closest('.mural-reacoes-container')) {
-        return; // Não fecha se o clique foi no botão ou num emoji
+        return;
       }
       setPickerAbertoId(null);
     };
@@ -70,10 +69,9 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
     });
   };
 
-  // BUSCA DE AVISOS E REAÇÕES NO BANCO
+  // BUSCA INICIAL DOS DADOS
   const buscarAvisos = async () => {
     try {
-      setCarregando(true);
       const { data: avisosData, error: errAvisos } = await supabase
         .from('avisos_mural')
         .select('*')
@@ -91,7 +89,7 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
           reacoesData = rData;
         }
       } catch (errR) {
-        console.warn('Tabela reacoes_mural ainda não criada:', errR);
+        console.warn('Tabela reacoes_mural:', errR);
       }
 
       if (avisosData) {
@@ -149,25 +147,90 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
     }
   };
 
+  // GERENCIAMENTO DO CANAL REALTIME (INSTANTÂNEO PARA TODOS)
   useEffect(() => {
     buscarAvisos();
 
-    const canal = supabase
-      .channel('avisos_e_reacoes_realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'avisos_mural' }, () => {
+    // Cria um canal dedicado de alta prioridade
+    const canal = supabase.channel('canal_mural_realtime_instantaneo', {
+      config: {
+        broadcast: { ack: false }
+      }
+    });
+
+    // 1. Escuta alterações em tempo real nos Avisos do Mural
+    canal.on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'avisos_mural' },
+      () => {
         buscarAvisos();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'reacoes_mural' }, () => {
+      }
+    );
+
+    // 2. Escuta alterações em tempo real nas Reações
+    canal.on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'reacoes_mural' },
+      (payload) => {
+        const nova = payload.new;
+        setAvisos((prev) =>
+          prev.map((aviso) => {
+            if (String(aviso.id) !== String(nova.aviso_id)) return aviso;
+            const jaTem = aviso.reacoesBrutas.some(
+              (r) => r.id === nova.id || (r.user_id === nova.user_id && r.emoji === nova.emoji)
+            );
+            if (jaTem) return aviso;
+            const atualizadas = [...aviso.reacoesBrutas, nova];
+            return {
+              ...aviso,
+              reacoesBrutas: atualizadas,
+              reacoesAgrupadas: agruparReacoes(atualizadas, usuarioLogado)
+            };
+          })
+        );
+      }
+    );
+
+    canal.on(
+      'postgres_changes',
+      { event: 'DELETE', schema: 'public', table: 'reacoes_mural' },
+      (payload) => {
+        const deletada = payload.old;
+        setAvisos((prev) =>
+          prev.map((aviso) => {
+            const atualizadas = aviso.reacoesBrutas.filter((r) => {
+              if (deletada.id && r.id === deletada.id) return false;
+              if (deletada.aviso_id && deletada.user_id && deletada.emoji) {
+                return !(
+                  String(r.aviso_id) === String(deletada.aviso_id) &&
+                  r.user_id === deletada.user_id &&
+                  r.emoji === deletada.emoji
+                );
+              }
+              return true;
+            });
+            return {
+              ...aviso,
+              reacoesBrutas: atualizadas,
+              reacoesAgrupadas: agruparReacoes(atualizadas, usuarioLogado)
+            };
+          })
+        );
+      }
+    );
+
+    canal.subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
         buscarAvisos();
-      })
-      .subscribe();
+      }
+    });
 
     return () => {
       supabase.removeChannel(canal);
     };
-  }, []);
+  }, [usuarioLogado?.id]);
 
-  // REAÇÃO / DES-REAÇÃO INSTANTÂNEA
+  // REAÇÃO OTIMISTA (0 ms no cliente + sincronização no banco)
   const handleToggleReacao = async (avisoId, emoji) => {
     if (!usuarioLogado?.id) {
       dispararToast('Você precisa estar autenticado para reagir.', 'erro');
@@ -182,7 +245,7 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
         r.emoji === emoji
     );
 
-    // Atualização otimista na tela (0 ms)
+    // Atualização otimista local imediata
     setAvisos((prevAvisos) =>
       prevAvisos.map((a) => {
         if (a.id !== avisoId) return a;
@@ -234,13 +297,12 @@ export default function HomeView({ setView, isSupervisor, usuarioLogado }) {
         if (error) throw error;
       }
     } catch (err) {
-      console.error('Erro ao atualizar reação:', err);
-      dispararToast('Erro ao registrar reação: ' + err.message, 'erro');
+      console.error('Erro ao registrar reação:', err);
+      dispararToast('Erro ao atualizar reação: ' + err.message, 'erro');
       await buscarAvisos();
     }
   };
 
-  // ABERTURA DE MODAL (CRIAR E EDITAR)
   const handleAbrirCriar = () => {
     setAvisoEmEdicao(null);
     setFormNovo({
