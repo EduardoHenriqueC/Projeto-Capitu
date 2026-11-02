@@ -352,7 +352,6 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
         .order('id', { ascending: true });
 
       if (error) {
-        // Fallback caso a coluna ordem ainda não exista no schema
         const { data: fallbackData } = await supabase
           .from('categorias_colinhas')
           .select('*')
@@ -430,6 +429,11 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
         if (!subsMap[cat.parent_id]) subsMap[cat.parent_id] = [];
         subsMap[cat.parent_id].push(cat);
       }
+    });
+
+    // Garante ordenação também para as subcategorias de cada categoria pai
+    Object.keys(subsMap).forEach((paiId) => {
+      subsMap[paiId].sort((a, b) => (a.ordem ?? a.id) - (b.ordem ?? b.id));
     });
 
     return { categoriasPrincipais: principais, subcategoriasPorPai: subsMap };
@@ -987,16 +991,21 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
                     return [...reordenadas, ...subs];
                   });
 
-                  // Persistência em lote no banco
+                  // Persistência com verificação estrita de erros no banco
                   try {
                     const updates = novasPrincipais.map((c, idx) =>
                       supabase.from('categorias_colinhas').update({ ordem: idx }).eq('id', c.id)
                     );
-                    await Promise.all(updates);
-                    dispararToast('Posição das categorias atualizada!', 'sucesso');
+                    const responses = await Promise.all(updates);
+                    const erroEncontrado = responses.find((r) => r.error);
+                    if (erroEncontrado) {
+                      throw erroEncontrado.error;
+                    }
+
+                    dispararToast('Posição das categorias salva no banco!', 'sucesso');
                   } catch (err) {
                     console.error('Erro ao salvar nova ordem:', err);
-                    dispararToast('Erro ao salvar ordem no banco.', 'erro');
+                    dispararToast('Erro ao salvar no banco: ' + (err.message || 'Verifique as permissões'), 'erro');
                     await buscarCategorias();
                   }
                 }}
@@ -1024,7 +1033,6 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flex: 1 }}>
-                    {/* Indicador sutil de arrastar para supervisores */}
                     {isSupervisor && editandoCatId !== cat.id && (
                       <span
                         title="Segure e arraste para reposicionar"
@@ -1241,16 +1249,21 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
                               })
                             );
 
-                            // Persistência em lote no banco
+                            // Persistência com verificação estrita de erros no banco
                             try {
                               const updates = novasSubs.map((s, idx) =>
                                 supabase.from('categorias_colinhas').update({ ordem: idx }).eq('id', s.id)
                               );
-                              await Promise.all(updates);
-                              dispararToast('Posição das subcategorias atualizada!', 'sucesso');
+                              const responses = await Promise.all(updates);
+                              const erroEncontrado = responses.find((r) => r.error);
+                              if (erroEncontrado) {
+                                throw erroEncontrado.error;
+                              }
+
+                              dispararToast('Posição das subcategorias salva no banco!', 'sucesso');
                             } catch (err) {
                               console.error('Erro ao salvar ordem de subcategorias:', err);
-                              dispararToast('Erro ao salvar ordem no banco.', 'erro');
+                              dispararToast('Erro ao salvar no banco: ' + (err.message || 'Verifique as permissões'), 'erro');
                               await buscarCategorias();
                             }
                           }}
