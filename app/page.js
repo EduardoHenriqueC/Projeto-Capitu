@@ -9,10 +9,10 @@ import ColinhasBoard from '@/components/ColinhasBoard';
 import RegulamentosView from '@/components/RegulamentosView';
 import LinksView from '@/components/LinksView';
 
-const LIMITE_INATIVIDADE_MS = 30 * 60 * 1000; // 30 min sem atividade => logout
-const MAX_TENTATIVAS = 5;                     // Falhas seguidas antes do bloqueio local
-const BLOQUEIO_MS = 30 * 1000;                // 30 s de espera após estourar tentativas
-const MIN_SENHA = 8;                          // Senha mínima redefinida para 8 caracteres
+const LIMITE_INATIVIDADE_MS = 30 * 60 * 1000;
+const MAX_TENTATIVAS = 5;
+const BLOQUEIO_MS = 30 * 1000;
+const MIN_SENHA = 8;
 
 const estiloLabel = {
   display: 'block',
@@ -122,7 +122,7 @@ export default function Page() {
     });
   }, []);
 
-  // 2. MONITORAMENTO DE SESSÃO E LIMPEZA DE STORAGE ANTIGO
+  // 2. MONITORAMENTO DE SESSÃO
   useEffect(() => {
     try {
       localStorage.removeItem('capitu_session');
@@ -214,7 +214,7 @@ export default function Page() {
     }
   };
 
-  // 5. TROCA DE SENHA NO PRIMEIRO ACESSO (MÍNIMO 8 CARACTERES)
+  // 5. TROCA DE SENHA NO PRIMEIRO ACESSO
   const handleTrocarSenhaPrimeiroAcesso = async (e) => {
     e.preventDefault();
     setMsgErro('');
@@ -508,7 +508,7 @@ export default function Page() {
                 fontWeight: '700',
                 fontSize: '0.86rem',
                 cursor: 'pointer',
-                transition: 'all 0.2s',
+                transition: 'background-color 0.15s ease, color 0.15s ease',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px'
@@ -594,40 +594,35 @@ export default function Page() {
         </div>
       </header>
 
-      {/* TELAS: Carregadas apenas com o primeiro acesso concluído */}
+      {/* TELAS PERSISTENTES: SEM DESTRUIR DOM (Zero travamento ao alternar abas) */}
       {!usuario.precisaTrocarSenha && (
-        <main key={view} style={{ minHeight: 'calc(100vh - 72px)' }}>
-          {view === 'inicio' && (
+        <main style={{ minHeight: 'calc(100vh - 72px)' }}>
+          <div style={{ display: view === 'inicio' ? 'block' : 'none' }}>
             <HomeView
               setView={setView}
               isSupervisor={isSupervisor}
               usuarioLogado={usuario}
             />
-          )}
+          </div>
 
-          {view === 'colinhas' && (
+          <div style={{ display: view === 'colinhas' ? 'block' : 'none' }}>
             <ColinhasBoard
               setView={setView}
               isSupervisor={isSupervisor}
               usuarioLogado={usuario}
             />
-          )}
+          </div>
 
-          {view === 'regulamentos' && (
+          <div style={{ display: view === 'regulamentos' ? 'block' : 'none' }}>
             <RegulamentosView
-              setView={setView}
               isSupervisor={isSupervisor}
               usuarioLogado={usuario}
             />
-          )}
+          </div>
 
-          {view === 'links' && (
-            <LinksView
-              setView={setView}
-              isSupervisor={isSupervisor}
-              usuarioLogado={usuario}
-            />
-          )}
+          <div style={{ display: view === 'links' ? 'block' : 'none' }}>
+            <LinksView />
+          </div>
         </main>
       )}
 

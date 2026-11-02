@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, memo } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
 
@@ -13,8 +13,249 @@ const normalizar = (str) =>
     .replace(/[^\w\s]/gi, '')
     .trim();
 
-export default function ColinhasBoard({ setView, isSupervisor, usuarioLogado }) {
-  const [agente, setAgente] = useState('');
+// =====================================================================
+// MOTOR DE CÁLCULO DE DIAS ÚTEIS E FERIADOS (COM CACHE DE MÓDULO)
+// =====================================================================
+
+const CACHE_FERIADOS = {};
+
+const calcularDataPascoa = (ano) => {
+  const a = ano % 19;
+  const b = Math.floor(ano / 100);
+  const c = ano % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const mes = Math.floor((h + l - 7 * m + 114) / 31);
+  const dia = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(ano, mes - 1, dia);
+};
+
+const formatarChaveISO = (data) => {
+  const a = data.getFullYear();
+  const m = String(data.getMonth() + 1).padStart(2, '0');
+  const d = String(data.getDate()).padStart(2, '0');
+  return `${a}-${m}-${d}`;
+};
+
+const obterFeriadosNacionais = (ano) => {
+  if (CACHE_FERIADOS[ano]) return CACHE_FERIADOS[ano];
+
+  const pascoa = calcularDataPascoa(ano);
+  const somarDias = (base, n) => {
+    const d = new Date(base);
+    d.setDate(d.getDate() + n);
+    return d;
+  };
+
+  const feriados = new Set([
+    `${ano}-01-01`,
+    formatarChaveISO(somarDias(pascoa, -48)),
+    formatarChaveISO(somarDias(pascoa, -47)),
+    formatarChaveISO(somarDias(pascoa, -2)),
+    formatarChaveISO(pascoa),
+    `${ano}-04-21`,
+    `${ano}-05-01`,
+    formatarChaveISO(somarDias(pascoa, 60)),
+    `${ano}-09-07`,
+    `${ano}-10-12`,
+    `${ano}-11-02`,
+    `${ano}-11-15`,
+    `${ano}-11-20`,
+    `${ano}-12-25`,
+  ]);
+
+  CACHE_FERIADOS[ano] = feriados;
+  return feriados;
+};
+
+export const calcularDataPrazo = (qtd = 2, tipoPrazo = 'uteis', dataBase = new Date()) => {
+  let atual = new Date(dataBase);
+  atual.setHours(0, 0, 0, 0);
+
+  if (tipoPrazo === 'corridos') {
+    atual.setDate(atual.getDate() + qtd);
+    return atual;
+  }
+
+  let diasContados = 0;
+  while (diasContados < qtd) {
+    atual.setDate(atual.getDate() + 1);
+    const ano = atual.getFullYear();
+    const feriados = obterFeriadosNacionais(ano);
+
+    const diaSemana = atual.getDay();
+    const chave = formatarChaveISO(atual);
+
+    if (diaSemana !== 0 && diaSemana !== 6 && !feriados.has(chave)) {
+      diasContados++;
+    }
+  }
+  return atual;
+};
+
+const formatarDataBR = (data) =>
+  data.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+// Cache diário da data limite (+2 dias úteis calculados uma única vez)
+let CACHE_PRAZO_HOJE = null;
+let DIA_ULTIMO_CALCULO = null;
+
+const obterPrazo2DiasUteisFormatado = () => {
+  const hojeStr = new Date().toDateString();
+  if (CACHE_PRAZO_HOJE && DIA_ULTIMO_CALCULO === hojeStr) {
+    return CACHE_PRAZO_HOJE;
+  }
+  DIA_ULTIMO_CALCULO = hojeStr;
+  CACHE_PRAZO_HOJE = formatarDataBR(calcularDataPrazo(2, 'uteis'));
+  return CACHE_PRAZO_HOJE;
+};
+
+const compilarTextoRapido = (template, dataFormatada) => {
+  if (!template) return '';
+  return template
+    .replace(/Me chamo {agente} e /gi, '')
+    .replace(/Me chamo {agente}/gi, 'Aqui é da Equipe Estante Virtual')
+    .replace(/{agente}/gi, '')
+    .replace(/\n*Atenciosamente,?\s*(\n.*)*$/i, '')
+    .replace(/\n*Equipe Estante Virtual.*$/i, '')
+    .replace(/{prazo_retorno}/gi, dataFormatada)
+    .replace(
+      /(prazo\s*(?:de)?\s*retorno\s*[:\-]?\s*)\d{1,2}\/\d{1,2}(?:\/\d{2,4})?/gi,
+      `$1${dataFormatada}`
+    )
+    .trim();
+};
+
+// =====================================================================
+// CARD INDIVIDUAL MEMOIZADO (Zero lag de re-render)
+// =====================================================================
+
+const CardColinha = memo(function CardColinha({
+  colinha,
+  cores,
+  isSupervisor,
+  onVerNota,
+  onAlternarFixar,
+  onEditar,
+  onExcluir
+}) {
+  return (
+    <div
+      onClick={() => onVerNota(colinha)}
+      className="card-colinha-otimizado"
+      style={{
+        backgroundColor: cores.bg,
+        border: colinha.fixado ? '2px solid #006968' : `1px solid ${cores.border}`,
+        borderRadius: '16px',
+        padding: '20px',
+        cursor: 'pointer',
+        position: 'relative',
+        boxShadow: colinha.fixado ? '0 6px 16px rgba(0, 105, 104, 0.12)' : '0 2px 8px rgba(0, 0, 0, 0.04)'
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+        <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+          {colinha.fixado && (
+            <span style={{ fontSize: '0.68rem', fontWeight: '800', background: '#004D4C', color: '#FFF', padding: '2px 8px', borderRadius: '4px' }}>
+              📌 FIXADA
+            </span>
+          )}
+          <span style={{ fontSize: '0.7rem', fontWeight: '800', textTransform: 'uppercase', color: 'rgba(0, 0, 0, 0.55)', letterSpacing: '0.4px' }}>
+            {colinha.c}
+          </span>
+          {colinha.sub && (
+            <span style={{ fontSize: '0.68rem', fontWeight: '800', background: 'rgba(0,0,0,0.06)', padding: '2px 6px', borderRadius: '4px', color: '#334155' }}>
+              ↳ {colinha.sub}
+            </span>
+          )}
+        </div>
+
+        {isSupervisor && (
+          <div style={{ display: 'flex', gap: '6px' }} onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={(e) => onAlternarFixar(e, colinha)}
+              title={colinha.fixado ? 'Desafixar colinha' : 'Fixar colinha no topo'}
+              style={{
+                background: colinha.fixado ? '#006968' : '#FFFFFF',
+                color: colinha.fixado ? '#FFFFFF' : '#475569',
+                border: '1px solid #CBD5E1',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                padding: '3px 8px',
+                fontSize: '0.76rem',
+                fontWeight: '700'
+              }}
+            >
+              📌
+            </button>
+
+            <button
+              onClick={(e) => onEditar(e, colinha)}
+              title="Editar e Mover Colinha"
+              style={{
+                background: '#FFFFFF',
+                border: '1px solid #CBD5E1',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                padding: '3px 8px',
+                fontSize: '0.74rem',
+                fontWeight: '700',
+                color: '#334155'
+              }}
+            >
+              ✏️
+            </button>
+
+            <button
+              onClick={(e) => onExcluir(e, colinha)}
+              title="Excluir Colinha"
+              className="btn-excluir-hover"
+              style={{
+                background: '#FFFFFF',
+                border: '1px solid #CBD5E1',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                padding: '3px 8px',
+                fontSize: '0.76rem',
+                fontWeight: '800',
+                color: '#64748B'
+              }}
+            >
+              ✕
+            </button>
+          </div>
+        )}
+      </div>
+
+      <h4 style={{ margin: '0 0 12px 0', fontSize: '1rem', color: '#0F172A', fontWeight: '800' }}>
+        {colinha.t}
+      </h4>
+
+      {/* Renderiza o texto pré-compilado sem reprocessamento */}
+      <div style={{ fontSize: '0.86rem', color: '#334155', lineHeight: '1.6', whiteSpace: 'pre-wrap', maxHeight: '180px', overflowY: 'hidden', position: 'relative' }}>
+        {colinha.txtCompilado}
+        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '36px', background: `linear-gradient(transparent, ${cores.bg})` }} />
+      </div>
+
+      <div style={{ marginTop: '14px', paddingTop: '10px', borderTop: '1px dashed rgba(0, 0, 0, 0.1)', textAlign: 'right', fontSize: '0.76rem', fontWeight: '700', color: '#006968' }}>
+        Clique para expandir nota 🔍
+      </div>
+    </div>
+  );
+});
+
+// =====================================================================
+// COMPONENTE PRINCIPAL COLINHAS BOARD
+// =====================================================================
+
+export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
   const [isMounted, setIsMounted] = useState(false);
   const [termoBusca, setTermoBusca] = useState('');
   
@@ -75,7 +316,7 @@ export default function ColinhasBoard({ setView, isSupervisor, usuarioLogado }) 
     return { bg: '#FFFFFF', border: '#CBD5E1' };
   };
 
-  // 1. CARREGAR CATEGORIAS
+  // 1. CARREGAMENTO ÚNICO
   const buscarCategorias = async () => {
     try {
       const { data, error } = await supabase
@@ -90,7 +331,6 @@ export default function ColinhasBoard({ setView, isSupervisor, usuarioLogado }) 
     }
   };
 
-  // 2. CARREGAR COLINHAS
   const buscarColinhas = async () => {
     try {
       const { data, error } = await supabase
@@ -100,12 +340,16 @@ export default function ColinhasBoard({ setView, isSupervisor, usuarioLogado }) 
 
       if (error) throw error;
       if (data) {
+        const prazoHoje = obterPrazo2DiasUteisFormatado();
+
+        // Pré-compilação: o cálculo e regex rodam uma vez só na chegada dos dados
         const processadas = data.map((item) => ({
           id: item.id,
           t: item.titulo,
           c: item.categoria,
           sub: item.subcategoria || '',
           txt: item.conteudo,
+          txtCompilado: compilarTextoRapido(item.conteudo, prazoHoje),
           atalho: item.atalho || '',
           fixado: Boolean(item.fixado),
           cNorm: normalizar(item.categoria),
@@ -121,9 +365,6 @@ export default function ColinhasBoard({ setView, isSupervisor, usuarioLogado }) 
 
   useEffect(() => {
     setIsMounted(true);
-    const salvo = localStorage.getItem('capitu_agente_nome');
-    if (salvo) setAgente(salvo);
-
     buscarCategorias();
     buscarColinhas();
 
@@ -143,34 +384,6 @@ export default function ColinhasBoard({ setView, isSupervisor, usuarioLogado }) 
       modalContainerRef.current.focus({ preventScroll: true });
     }
   }, [modalNota]);
-
-  const handleAgenteChange = (e) => {
-    const valor = e.target.value;
-    setAgente(valor);
-    localStorage.setItem('capitu_agente_nome', valor);
-  };
-
-  const compilarTexto = (template, categoria) => {
-    const nome = agente.trim();
-    let final = template || '';
-
-    if (nome) {
-      final = final.replace(/{agente}/gi, nome);
-      if (categoria !== 'Máscaras & Registros' && !final.includes('Atenciosamente') && !final.includes('Liderança:')) {
-        final += `\n\nAtenciosamente,\n${nome}\nEquipe Estante Virtual 💚`;
-      }
-    } else {
-      final = final.replace(/Me chamo {agente} e /gi, '');
-      final = final.replace(/Me chamo {agente}/gi, 'Aqui é da Equipe Estante Virtual');
-      final = final.replace(/\n{agente}\nEquipe Estante Virtual/gi, '\nEquipe Estante Virtual');
-      final = final.replace(/{agente}/gi, 'Equipe Estante Virtual');
-
-      if (categoria !== 'Máscaras & Registros' && !final.includes('Atenciosamente') && !final.includes('Liderança:')) {
-        final += `\n\nAtenciosamente,\nEquipe Estante Virtual 💚`;
-      }
-    }
-    return final;
-  };
 
   const { categoriasPrincipais, subcategoriasPorPai } = useMemo(() => {
     const principais = [];
@@ -364,7 +577,7 @@ export default function ColinhasBoard({ setView, isSupervisor, usuarioLogado }) 
     }
   };
 
-  // FILTRAGEM CORRIGIDA: SUBCATEGORIAS NOVAS NÃO PUXAM MAIS COLINHAS VAZIAS
+  // Filtragem com busca indexada rápida
   const colinhasFiltradas = useMemo(() => {
     const termo = normalizar(termoBusca);
     const filtroNomeNorm = normalizar(filtroAtivo.nome);
@@ -384,11 +597,9 @@ export default function ColinhasBoard({ setView, isSupervisor, usuarioLogado }) 
               (filtroNomeNorm.length > 2 && c.cNorm.includes(filtroNomeNorm));
           }
         } else if (filtroAtivo.tipo === 'subcategoria') {
-          // Se a colinha não tem subcategoria definida, NUNCA corresponde à subcategoria ativa
           if (!c.sub || !c.subNorm) {
             bateCategoria = false;
           } else {
-            // Comparação estrita para garantir que subcategorias recém-criadas comecem zeradas
             bateCategoria =
               c.sub === filtroAtivo.nome ||
               c.subNorm === filtroNomeNorm;
@@ -407,7 +618,24 @@ export default function ColinhasBoard({ setView, isSupervisor, usuarioLogado }) 
   return (
     <div style={{ maxWidth: '1440px', margin: '0 auto', padding: '36px 20px 80px 20px' }}>
       
-      {/* BARRA SUPERIOR DE PESQUISA E ASSINATURA */}
+      {/* ESTILOS CSS NATIVOS (Desafoga a CPU do notebook) */}
+      <style>{`
+        .card-colinha-otimizado {
+          transition: transform 0.16s ease, box-shadow 0.16s ease;
+          will-change: transform;
+        }
+        .card-colinha-otimizado:hover {
+          transform: translateY(-3px);
+          box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08) !important;
+        }
+        .btn-excluir-hover:hover {
+          background-color: #FEE2E2 !important;
+          color: #DC2626 !important;
+          border-color: #FCA5A5 !important;
+        }
+      `}</style>
+
+      {/* BARRA SUPERIOR DE PESQUISA */}
       <div style={{
         background: '#FFFFFF',
         borderRadius: '16px',
@@ -439,37 +667,26 @@ export default function ColinhasBoard({ setView, isSupervisor, usuarioLogado }) 
           />
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', borderLeft: '1px solid #E2E8F0', paddingLeft: '16px' }}>
-          <label style={{ fontSize: '0.88rem', fontWeight: '700', color: '#004D4C' }}>✍️ Assinatura:</label>
-          <input
-            type="text"
-            placeholder="Ex: Mariana"
-            value={agente}
-            onChange={handleAgenteChange}
-            style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '0.9rem', width: '150px' }}
-          />  
-
-          {isSupervisor && (
-            <button
-              onClick={abrirModalCriar}
-              style={{
-                background: '#006968',
-                color: '#FFF',
-                border: 'none',
-                padding: '9px 18px',
-                borderRadius: '8px',
-                fontWeight: '700',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                boxShadow: '0 2px 6px rgba(0, 105, 104, 0.25)'
-              }}
-            >
-              ➕ Nova Colinha
-            </button>
-          )}
-        </div>
+        {isSupervisor && (
+          <button
+            onClick={abrirModalCriar}
+            style={{
+              background: '#006968',
+              color: '#FFF',
+              border: 'none',
+              padding: '9px 18px',
+              borderRadius: '8px',
+              fontWeight: '700',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              boxShadow: '0 2px 6px rgba(0, 105, 104, 0.25)'
+            }}
+          >
+            ➕ Nova Colinha
+          </button>
+        )}
       </div>
 
       {/* LAYOUT: MENU LATERAL + LISTAGEM */}
@@ -511,16 +728,22 @@ export default function ColinhasBoard({ setView, isSupervisor, usuarioLogado }) 
           {categoriasPrincipais.map((cat) => {
             const isAtiva = filtroAtivo.tipo === 'principal' && filtroAtivo.id === cat.id;
             const subs = subcategoriasPorPai[cat.id] || [];
-            
             const isSubAtivaDestePai = filtroAtivo.tipo === 'subcategoria' && filtroAtivo.parentId === cat.id;
-            const isOpen = Boolean(expandidas[cat.id] || isSubAtivaDestePai || isAtiva);
+
+            const isOpen = expandidas[cat.id] !== undefined
+              ? expandidas[cat.id]
+              : isSubAtivaDestePai;
 
             return (
               <div key={cat.id} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                 <div
                   onClick={() => {
-                    setExpandidas((prev) => ({ ...prev, [cat.id]: true }));
-                    setFiltroAtivo({ tipo: 'principal', id: cat.id, nome: cat.nome, parentId: null });
+                    if (isAtiva && subs.length > 0) {
+                      setExpandidas((prev) => ({ ...prev, [cat.id]: !isOpen }));
+                    } else {
+                      setExpandidas((prev) => ({ ...prev, [cat.id]: true }));
+                      setFiltroAtivo({ tipo: 'principal', id: cat.id, nome: cat.nome, parentId: null });
+                    }
                   }}
                   style={{
                     display: 'flex',
@@ -532,7 +755,7 @@ export default function ColinhasBoard({ setView, isSupervisor, usuarioLogado }) 
                     background: isAtiva ? 'rgba(0, 105, 104, 0.08)' : 'transparent',
                     color: isAtiva ? '#006968' : '#334155',
                     cursor: 'pointer',
-                    transition: 'all 0.15s ease'
+                    transition: 'background-color 0.15s ease'
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', overflow: 'hidden' }}>
@@ -678,7 +901,7 @@ export default function ColinhasBoard({ setView, isSupervisor, usuarioLogado }) 
             </p>
           </div>
 
-          <div style={{ opacity: isMounted ? 1 : 0, transition: 'opacity 0.2s ease-in' }}>
+          <div style={{ opacity: isMounted ? 1 : 0 }}>
             {isMounted && colinhasFiltradas.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '60px 20px', color: '#64748B', background: '#FFF', borderRadius: '16px', border: '1px dashed #CBD5E1' }}>
                 <div style={{ fontSize: '2.5rem', marginBottom: '10px' }}>📑</div>
@@ -686,130 +909,21 @@ export default function ColinhasBoard({ setView, isSupervisor, usuarioLogado }) 
               </div>
             ) : isMounted ? (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px', alignItems: 'start' }}>
-                {colinhasFiltradas.map((c) => {
-                  const cores = getCor(c.c);
-                  return (
-                    <div
-                      key={c.id}
-                      onClick={() => setModalNota(c)}
-                      style={{
-                        backgroundColor: cores.bg,
-                        border: c.fixado ? '2px solid #006968' : `1px solid ${cores.border}`,
-                        borderRadius: '16px',
-                        padding: '20px',
-                        cursor: 'pointer',
-                        transition: 'transform 0.18s ease, box-shadow 0.18s ease',
-                        position: 'relative',
-                        boxShadow: c.fixado ? '0 6px 16px rgba(0, 105, 104, 0.12)' : '0 2px 8px rgba(0, 0, 0, 0.04)'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.transform = 'translateY(-4px)';
-                        e.currentTarget.style.boxShadow = '0 8px 20px rgba(0, 0, 0, 0.08)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.transform = 'translateY(0)';
-                        e.currentTarget.style.boxShadow = c.fixado ? '0 6px 16px rgba(0, 105, 104, 0.12)' : '0 2px 8px rgba(0, 0, 0, 0.04)';
-                      }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
-                          {c.fixado && (
-                            <span style={{ fontSize: '0.68rem', fontWeight: '800', background: '#004D4C', color: '#FFF', padding: '2px 8px', borderRadius: '4px' }}>
-                              📌 FIXADA
-                            </span>
-                          )}
-                          <span style={{ fontSize: '0.7rem', fontWeight: '800', textTransform: 'uppercase', color: 'rgba(0, 0, 0, 0.55)', letterSpacing: '0.4px' }}>
-                            {c.c}
-                          </span>
-                          {c.sub && (
-                            <span style={{ fontSize: '0.68rem', fontWeight: '800', background: 'rgba(0,0,0,0.06)', padding: '2px 6px', borderRadius: '4px', color: '#334155' }}>
-                              ↳ {c.sub}
-                            </span>
-                          )}
-                        </div>
-
-                        {isSupervisor && (
-                          <div style={{ display: 'flex', gap: '6px' }} onClick={(e) => e.stopPropagation()}>
-                            <button
-                              onClick={(e) => alternarFixarColinha(e, c)}
-                              title={c.fixado ? 'Desafixar colinha' : 'Fixar colinha no topo'}
-                              style={{
-                                background: c.fixado ? '#006968' : '#FFFFFF',
-                                color: c.fixado ? '#FFFFFF' : '#475569',
-                                border: '1px solid #CBD5E1',
-                                borderRadius: '6px',
-                                cursor: 'pointer',
-                                padding: '3px 8px',
-                                fontSize: '0.76rem',
-                                fontWeight: '700'
-                              }}
-                            >
-                              📌
-                            </button>
-
-                            <button
-                              onClick={(e) => abrirModalEditar(e, c)}
-                              title="Editar e Mover Colinha"
-                              style={{
-                                background: '#FFFFFF',
-                                border: '1px solid #CBD5E1',
-                                borderRadius: '6px',
-                                cursor: 'pointer',
-                                padding: '3px 8px',
-                                fontSize: '0.74rem',
-                                fontWeight: '700',
-                                color: '#334155'
-                              }}
-                            >
-                              ✏️
-                            </button>
-
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setColinhaParaExcluir(c);
-                              }}
-                              title="Excluir Colinha"
-                              style={{
-                                background: '#FFFFFF',
-                                border: '1px solid #CBD5E1',
-                                borderRadius: '6px',
-                                cursor: 'pointer',
-                                padding: '3px 8px',
-                                fontSize: '0.76rem',
-                                fontWeight: '800',
-                                color: '#64748B'
-                              }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.background = '#FEE2E2';
-                                e.currentTarget.style.color = '#DC2626';
-                                e.currentTarget.style.borderColor = '#FCA5A5';
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.background = '#FFFFFF';
-                                e.currentTarget.style.color = '#64748B';
-                                e.currentTarget.style.borderColor = '#CBD5E1';
-                              }}
-                            >
-                              ✕
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                      
-                      <h4 style={{ margin: '0 0 12px 0', fontSize: '1rem', color: '#0F172A', fontWeight: '800' }}>{c.t}</h4>
-                      
-                      <div style={{ fontSize: '0.86rem', color: '#334155', lineHeight: '1.6', whiteSpace: 'pre-wrap', maxHeight: '180px', overflowY: 'hidden', position: 'relative' }}>
-                        {compilarTexto(c.txt, c.c)}
-                        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '36px', background: `linear-gradient(transparent, ${cores.bg})` }}></div>
-                      </div>
-
-                      <div style={{ marginTop: '14px', paddingTop: '10px', borderTop: '1px dashed rgba(0, 0, 0, 0.1)', textAlign: 'right', fontSize: '0.76rem', fontWeight: '700', color: '#006968' }}>
-                        Clique para expandir nota 🔍
-                      </div>
-                    </div>
-                  );
-                })}
+                {colinhasFiltradas.map((c) => (
+                  <CardColinha
+                    key={c.id}
+                    colinha={c}
+                    cores={getCor(c.c)}
+                    isSupervisor={isSupervisor}
+                    onVerNota={setModalNota}
+                    onAlternarFixar={alternarFixarColinha}
+                    onEditar={abrirModalEditar}
+                    onExcluir={(e, item) => {
+                      e.stopPropagation();
+                      setColinhaParaExcluir(item);
+                    }}
+                  />
+                ))}
               </div>
             ) : null}
           </div>
@@ -912,7 +1026,7 @@ export default function ColinhasBoard({ setView, isSupervisor, usuarioLogado }) 
                 flex: 1
               }}
             >
-              {compilarTexto(modalNota.txt, modalNota.c)}
+              {modalNota.txtCompilado}
             </div>
 
             <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
@@ -933,16 +1047,6 @@ export default function ColinhasBoard({ setView, isSupervisor, usuarioLogado }) 
                       fontWeight: '700',
                       cursor: 'pointer',
                       fontSize: '0.85rem'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = '#FEE2E2';
-                      e.currentTarget.style.color = '#DC2626';
-                      e.currentTarget.style.borderColor = '#FCA5A5';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = '#FFFFFF';
-                      e.currentTarget.style.color = '#64748B';
-                      e.currentTarget.style.borderColor = '#CBD5E1';
                     }}
                   >
                     ✕ Excluir
@@ -975,7 +1079,7 @@ export default function ColinhasBoard({ setView, isSupervisor, usuarioLogado }) 
 
                 <button
                   onClick={() => {
-                    navigator.clipboard.writeText(compilarTexto(modalNota.txt, modalNota.c));
+                    navigator.clipboard.writeText(modalNota.txtCompilado);
                     dispararToast(`📋 Texto de "${modalNota.t}" copiado!`, 'sucesso');
                   }}
                   style={{
@@ -1076,11 +1180,13 @@ export default function ColinhasBoard({ setView, isSupervisor, usuarioLogado }) 
               </div>
 
               <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '700', marginBottom: '4px' }}>Texto da Colinha</label>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '700', marginBottom: '4px' }}>
+                  Texto da Colinha (Use <span style={{ color: '#006968' }}>{'{prazo_retorno}'}</span> para calcular 2 dias úteis)
+                </label>
                 <textarea
                   rows="7"
                   required
-                  placeholder="Olá! Sou {agente} da Estante Virtual..."
+                  placeholder="Olá! Seu pedido está em trânsito..."
                   value={formData.txt}
                   onChange={(e) => setFormData({ ...formData, txt: e.target.value })}
                   style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '0.88rem', lineHeight: '1.5', outline: 'none' }}
