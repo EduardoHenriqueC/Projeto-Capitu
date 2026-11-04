@@ -16,6 +16,19 @@ const normalizar = (str) =>
 // Remove tags HTML para gerar um índice de busca limpo
 const stripHtml = (html) => (html || '').replace(/<[^>]*>?/gm, '');
 
+// Higieniza rigorosamente o início do texto removendo qualquer espaço, &nbsp; ou tag vazia da primeira linha
+const limparEspacosIniciais = (str) => {
+  if (!str) return '';
+  let res = str.trim();
+  // Remove tags iniciais vazias ou quebras soltas
+  res = res.replace(/^(?:<p>\s*(?:<br\s*\/?>|&nbsp;|\u00A0)?\s*<\/p>|<div>\s*(?:<br\s*\/?>|&nbsp;|\u00A0)?\s*<\/div>|<br\s*\/?>|\s|&nbsp;|\u00A0)+/gi, '');
+  // Remove espaço ou &nbsp; logo após a primeira tag de abertura (ex: <div> Olá -> <div>Olá)
+  res = res.replace(/^((?:<[^>]+>)+)(?:\s|&nbsp;|\u00A0)+/gi, '$1');
+  // Remove caso comece diretamente com espaço ou &nbsp;
+  res = res.replace(/^(?:\s|&nbsp;|\u00A0)+/gi, '');
+  return res.trim();
+};
+
 // =====================================================================
 // MOTOR DE CÁLCULO DE DIAS ÚTEIS E FERIADOS (COM CACHE DE MÓDULO)
 // =====================================================================
@@ -121,7 +134,7 @@ const obterPrazo2DiasUteisFormatado = () => {
 
 const compilarTextoRapido = (template, dataFormatada) => {
   if (!template) return '';
-  return template
+  const compilado = template
     .replace(/Me chamo {agente} e /gi, '')
     .replace(/Me chamo {agente}/gi, 'Aqui é da Equipe Estante Virtual')
     .replace(/{agente}/gi, '')
@@ -131,8 +144,8 @@ const compilarTextoRapido = (template, dataFormatada) => {
     .replace(
       /(prazo\s*(?:de)?\s*retorno\s*[:\-]?\s*)\d{1,2}\/\d{1,2}(?:\/\d{2,4})?/gi,
       `$1${dataFormatada}`
-    )
-    .trim();
+    );
+  return limparEspacosIniciais(compilado);
 };
 
 // =====================================================================
@@ -346,28 +359,127 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
     };
   }, [modalAberto, modalNota, modalCategoria, colinhaParaExcluir]);
 
-  const copiarComFormatacao = (htmlStr) => {
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = htmlStr;
-    tempDiv.style.position = 'absolute';
-    tempDiv.style.left = '-9999px';
-    document.body.appendChild(tempDiv);
+  // Cópia higienizada para e-mails: limpa cores, fontes forçadas e remove recuos na primeira linha
+  const copiarComFormatacao = async (htmlStr) => {
+    if (!htmlStr) return;
 
-    const range = document.createRange();
-    range.selectNodeContents(tempDiv);
-    const sel = window.getSelection();
-    sel.removeAllRanges();
-    sel.addRange(range);
+    let html = htmlStr.replace(/\r\n/g, '\n');
+    html = html.replace(/<\/div>\s*<div>/gi, '</div><div>');
+    html = html.replace(/<\/p>\s*<p>/gi, '</p><p>');
+    html = html.replace(/<ul[^>]*>\s*<li/gi, '<ul><li');
+    html = html.replace(/<\/li>\s*<li>/gi, '</li><li>');
+    html = html.replace(/<\/li>\s*<\/ul>/gi, '</li></ul>');
+    html = html.replace(/\n/g, '<br>');
 
-    try {
-      document.execCommand('copy');
-      dispararToast(`📋 Colinha copiada com formatação!`, 'sucesso');
-    } catch (err) {
-      console.error('Erro ao copiar formatação: ', err);
+    const temp = document.createElement('div');
+    temp.innerHTML = html;
+
+    // Higieniza atributos de estilo que poluem a colagem no email
+    const all = temp.querySelectorAll('*');
+    all.forEach((el) => {
+      el.removeAttribute('class');
+      el.removeAttribute('id');
+      if (el.hasAttribute('style')) {
+        el.style.backgroundColor = '';
+        el.style.background = '';
+        el.style.fontFamily = '';
+        el.style.fontSize = '';
+        el.style.lineHeight = '';
+        el.style.color = '';
+        if (!el.getAttribute('style') || el.getAttribute('style').trim() === '') {
+          el.removeAttribute('style');
+        }
+      }
+    });
+
+    // Remove qualquer elemento vazio ou espaço em branco que cause recuo na primeira linha
+    while (temp.firstChild) {
+      const fc = temp.firstChild;
+      if (fc.nodeType === Node.TEXT_NODE) {
+        fc.nodeValue = fc.nodeValue.replace(/^[\s\u00A0]+/, '');
+        if (fc.nodeValue.length === 0) {
+          temp.removeChild(fc);
+          continue;
+        }
+        break;
+      } else if (fc.nodeType === Node.ELEMENT_NODE) {
+        if (fc.tagName === 'BR') {
+          temp.removeChild(fc);
+          continue;
+        }
+        const textInside = fc.textContent || '';
+        if (!textInside.trim() && !fc.querySelector('img')) {
+          temp.removeChild(fc);
+          continue;
+        }
+        // Limpa o espaço inicial dentro do primeiro nó de texto do elemento
+        const walker = document.createTreeWalker(fc, NodeFilter.SHOW_TEXT, null, false);
+        const firstText = walker.nextNode();
+        if (firstText) {
+          firstText.nodeValue = firstText.nodeValue.replace(/^[\s\u00A0]+/, '');
+        }
+        break;
+      } else {
+        temp.removeChild(fc);
+      }
+    }
+
+    let cleanHtml = temp.innerHTML.trim();
+    cleanHtml = cleanHtml.replace(/^((?:<[^>]+>)*)[\s\u00A0&nbsp;]+/i, '$1');
+
+    let plainText = temp.innerText || temp.textContent || '';
+    plainText = plainText.replace(/^[\s\u00A0]+/, '');
+
+    let copiou = false;
+    if (navigator.clipboard && window.ClipboardItem) {
+      try {
+        const blobHtml = new Blob([cleanHtml], { type: 'text/html' });
+        const blobText = new Blob([plainText], { type: 'text/plain' });
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            'text/html': blobHtml,
+            'text/plain': blobText
+          })
+        ]);
+        copiou = true;
+      } catch (e) {
+        console.warn('ClipboardItem não suportado neste contexto, usando fallback.', e);
+      }
+    }
+
+    if (!copiou) {
+      try {
+        const helperDiv = document.createElement('div');
+        helperDiv.innerHTML = cleanHtml;
+        helperDiv.style.position = 'fixed';
+        helperDiv.style.left = '-9999px';
+        helperDiv.style.top = '-9999px';
+        helperDiv.style.opacity = '0';
+        helperDiv.style.background = 'transparent';
+        helperDiv.style.color = '#000000';
+        helperDiv.style.fontSize = '14px';
+
+        document.body.appendChild(helperDiv);
+        const range = document.createRange();
+        range.selectNodeContents(helperDiv);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+
+        document.execCommand('copy');
+        document.body.removeChild(helperDiv);
+        sel.removeAllRanges();
+        copiou = true;
+      } catch (err) {
+        console.error('Erro no fallback de cópia: ', err);
+      }
+    }
+
+    if (copiou) {
+      dispararToast('📋 Colinha copiada com formatação limpa!', 'sucesso');
+    } else {
       dispararToast('Erro ao copiar. Tente selecionar manualmente.', 'erro');
     }
-    
-    document.body.removeChild(tempDiv);
   };
 
   const getCor = (catNome) => {
@@ -617,7 +729,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
       c: catEncontrada ? catEncontrada.nome : item.c,
       sub: item.sub || '',
       atalho: item.atalho || '',
-      txt: item.txt
+      txt: limparEspacosIniciais(item.txt)
     });
     setModalAberto(true);
   };
@@ -674,7 +786,10 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
   const salvarColinha = async (e) => {
     e.preventDefault();
     
-    const conteudoHTML = editorRichTextRef.current ? editorRichTextRef.current.innerHTML : formData.txt;
+    let conteudoHTML = editorRichTextRef.current ? editorRichTextRef.current.innerHTML : formData.txt;
+    if (conteudoHTML) {
+      conteudoHTML = limparEspacosIniciais(conteudoHTML);
+    }
 
     if (!formData.t.trim() || !stripHtml(conteudoHTML).trim() || !formData.c) {
       dispararToast('Preencha título, categoria e conteúdo.', 'erro');
