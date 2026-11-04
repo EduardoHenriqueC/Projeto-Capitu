@@ -327,6 +327,25 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
     setTimeout(() => setToast({ visivel: false, mensagem: '', tipo: 'sucesso' }), 2800);
   };
 
+  // Trava o scroll da página ao fundo sempre que um modal estiver ativo
+  useEffect(() => {
+    const algumModalAberto = Boolean(modalAberto || modalNota || modalCategoria || colinhaParaExcluir);
+    if (algumModalAberto) {
+      const scrollBarWidth = window.innerWidth - document.documentElement.clientWidth;
+      document.body.style.overflow = 'hidden';
+      if (scrollBarWidth > 0) {
+        document.body.style.paddingRight = `${scrollBarWidth}px`;
+      }
+    } else {
+      document.body.style.overflow = '';
+      document.body.style.paddingRight = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+      document.body.style.paddingRight = '';
+    };
+  }, [modalAberto, modalNota, modalCategoria, colinhaParaExcluir]);
+
   const copiarComFormatacao = (htmlStr) => {
     const tempDiv = document.createElement('div');
     tempDiv.innerHTML = htmlStr;
@@ -603,19 +622,17 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
     setModalAberto(true);
   };
 
-  // Tratamento Nativo do Copiar & Colar Limpo
+  // Tratamento de Paste para padronização de fontes
   const handlePasteRichText = (e) => {
     e.preventDefault();
 
     let content = '';
-    // Se usou Ctrl+Shift+V ou se não tiver HTML (texto puro)
     if (e.clipboardData.types.includes('text/plain') && !e.clipboardData.types.includes('text/html')) {
       content = e.clipboardData.getData('text/plain');
       document.execCommand('insertText', false, content);
       return;
     }
 
-    // Se usou Ctrl+V com HTML (de Word, outro site, etc)
     content = e.clipboardData.getData('text/html');
     if (!content) {
       content = e.clipboardData.getData('text/plain');
@@ -623,7 +640,6 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
       return;
     }
 
-    // Limpeza forçada de fontes e tamanhos para padronizar visualmente
     const tempDiv = document.createElement('div');
     tempDiv.innerHTML = content;
     
@@ -636,7 +652,6 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
       el.style.backgroundColor = '';
       el.removeAttribute('class');
       
-      // Limpa tags desnecessárias (ex: metas do Word, spans vazios)
       if (el.tagName === 'SPAN' && !el.getAttribute('style') && !el.className) {
         const parent = el.parentNode;
         while (el.firstChild) parent.insertBefore(el.firstChild, el);
@@ -659,7 +674,6 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
   const salvarColinha = async (e) => {
     e.preventDefault();
     
-    // Captura o HTML com a formatação gerada no div contentEditable
     const conteudoHTML = editorRichTextRef.current ? editorRichTextRef.current.innerHTML : formData.txt;
 
     if (!formData.t.trim() || !stripHtml(conteudoHTML).trim() || !formData.c) {
@@ -792,12 +806,10 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
       .filter((c) => {
         const bateBusca = termo === '' || c.buscaIndex.includes(termo);
 
-        // Se estiver pesquisando, ignora as pastas e varre tudo globalmente
         if (termo !== '') {
           return bateBusca;
         }
 
-        // Se não estiver pesquisando, aplica o filtro normal da pasta
         let bateCategoria = true;
         if (filtroAtivo.tipo === 'principal') {
           if (!c.c || !c.cNorm) {
@@ -1030,7 +1042,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
           
           <button
             onClick={() => {
-              setTermoBusca(''); // Limpa a barra de pesquisa ao trocar de categoria
+              setTermoBusca('');
               setFiltroAtivo({ tipo: 'todas', id: 'todas', nome: 'Todas as Colinhas', parentId: null });
             }}
             style={{
@@ -1126,7 +1138,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
               >
                 <div
                   onClick={() => {
-                    setTermoBusca(''); // Limpa a barra de pesquisa
+                    setTermoBusca('');
                     if (isAtiva && subs.length > 0) {
                       setExpandidas((prev) => ({ ...prev, [cat.id]: !isOpen }));
                     } else {
@@ -1383,7 +1395,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
                           <div
                             onClick={(e) => {
                               e.stopPropagation();
-                              setTermoBusca(''); // Limpa a barra de pesquisa
+                              setTermoBusca('');
                               setExpandidas((prev) => ({ ...prev, [cat.id]: true }));
                               setFiltroAtivo({ tipo: 'subcategoria', id: sub.id, nome: sub.nome, parentId: cat.id });
                             }}
@@ -1656,7 +1668,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', flexShrink: 0 }}>
               <div>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                   <span style={{ fontSize: '0.75rem', fontWeight: '800', textTransform: 'uppercase', color: 'var(--texto-destaque-turquesa, #006968)' }}>
@@ -1715,7 +1727,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
               }}
             />
 
-            <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
+            <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
               <div>
                 {isSupervisor && (
                   <button
@@ -1785,124 +1797,183 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
         document.body
       )}
 
-      {/* MODAL 2: CRIAR / EDITAR / MOVER (COM RICH TEXT E LISTA) */}
+      {/* MODAL 2: CRIAR / EDITAR / MOVER (BLINDADO CONTRA OVERFLOW E CORTE DE BOTÕES) */}
       {isMounted && modalAberto && createPortal(
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0, 20, 20, 0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
-          <div style={{ background: 'var(--bg-card, #FFFFFF)', borderRadius: '16px', width: '100%', maxWidth: '600px', padding: '28px', border: '1px solid var(--border-card, transparent)', boxShadow: '0 20px 40px rgba(0,0,0,0.25)' }}>
-            <h3 style={{ margin: '0 0 16px 0', color: 'var(--texto-titulo-verde, #004D4C)' }}>
-              {formData.id ? '✏️ Editar / Mover Colinha' : '➕ Nova Colinha Operacional'}
-            </h3>
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 20, 20, 0.7)',
+            backdropFilter: 'blur(3px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '16px',
+            overflowY: 'auto'
+          }}
+        >
+          <div
+            style={{
+              background: 'var(--bg-card, #FFFFFF)',
+              borderRadius: '16px',
+              width: '100%',
+              maxWidth: '620px',
+              maxHeight: '92vh',
+              display: 'flex',
+              flexDirection: 'column',
+              padding: '24px 28px',
+              border: '1px solid var(--border-card, transparent)',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.25)',
+              overflow: 'hidden'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexShrink: 0 }}>
+              <h3 style={{ margin: 0, color: 'var(--texto-titulo-verde, #004D4C)', fontSize: '1.25rem', fontWeight: '800' }}>
+                {formData.id ? '✏️ Editar / Mover Colinha' : '➕ Nova Colinha Operacional'}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setModalAberto(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '1.2rem',
+                  cursor: 'pointer',
+                  color: 'var(--texto-secundario, #64748B)',
+                  padding: '2px 6px',
+                  borderRadius: '6px'
+                }}
+                title="Fechar"
+              >
+                ✕
+              </button>
+            </div>
             
-            <form onSubmit={salvarColinha}>
-              <div style={{ marginBottom: '12px' }}>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '700', marginBottom: '4px', color: 'var(--texto-secundario, #334155)' }}>Título</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Ex: Confirmação de Entrega"
-                  value={formData.t}
-                  onChange={(e) => setFormData({ ...formData, t: e.target.value })}
-                  style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid var(--border-search, #CBD5E1)', background: 'var(--bg-input, #FFF)', color: 'var(--texto-primario, #1E293B)', outline: 'none' }}
-                />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+            <form onSubmit={salvarColinha} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+              <div
+                style={{
+                  overflowY: 'auto',
+                  flex: 1,
+                  minHeight: 0,
+                  paddingRight: '6px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px'
+                }}
+              >
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '700', marginBottom: '4px', color: 'var(--texto-secundario, #334155)' }}>Categoria Principal</label>
-                  <select
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '700', marginBottom: '4px', color: 'var(--texto-secundario, #334155)' }}>Título</label>
+                  <input
+                    type="text"
                     required
-                    value={formData.c}
-                    onChange={(e) => setFormData({ ...formData, c: e.target.value, sub: '' })}
-                    style={{ width: '100%', padding: '9px', borderRadius: '6px', border: '1px solid var(--border-search, #CBD5E1)', background: 'var(--bg-input, #FFF)', color: 'var(--texto-primario, #1E293B)' }}
-                  >
-                    <option value="" disabled>Selecione uma categoria...</option>
-                    {categoriasPrincipais.map((cat) => (
-                      <option key={cat.id} value={cat.nome}>
-                        {cat.icone} {cat.nome}
-                      </option>
-                    ))}
-                  </select>
+                    placeholder="Ex: Confirmação de Entrega"
+                    value={formData.t}
+                    onChange={(e) => setFormData({ ...formData, t: e.target.value })}
+                    style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid var(--border-search, #CBD5E1)', background: 'var(--bg-input, #FFF)', color: 'var(--texto-primario, #1E293B)', outline: 'none' }}
+                  />
                 </div>
 
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '700', marginBottom: '4px', color: 'var(--texto-secundario, #334155)' }}>Subcategoria (Opcional)</label>
-                  <select
-                    value={formData.sub}
-                    onChange={(e) => setFormData({ ...formData, sub: e.target.value })}
-                    style={{ width: '100%', padding: '9px', borderRadius: '6px', border: '1px solid var(--border-search, #CBD5E1)', background: 'var(--bg-input, #FFF)', color: 'var(--texto-primario, #1E293B)' }}
-                  >
-                    <option value="">Nenhuma (Fica na raiz)</option>
-                    {(() => {
-                      const catPai = categoriasPrincipais.find(
-                        (cp) =>
-                          normalizar(cp.nome) === normalizar(formData.c) ||
-                          normalizar(cp.nome).includes(normalizar(formData.c)) ||
-                          normalizar(formData.c).includes(normalizar(cp.nome))
-                      );
-                      if (!catPai) return null;
-                      const subs = subcategoriasPorPai[catPai.id] || [];
-                      return subs.map((sub) => (
-                        <option key={sub.id} value={sub.nome}>
-                          {sub.icone} {sub.nome}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '700', marginBottom: '4px', color: 'var(--texto-secundario, #334155)' }}>Categoria Principal</label>
+                    <select
+                      required
+                      value={formData.c}
+                      onChange={(e) => setFormData({ ...formData, c: e.target.value, sub: '' })}
+                      style={{ width: '100%', padding: '9px', borderRadius: '6px', border: '1px solid var(--border-search, #CBD5E1)', background: 'var(--bg-input, #FFF)', color: 'var(--texto-primario, #1E293B)' }}
+                    >
+                      <option value="" disabled>Selecione uma categoria...</option>
+                      {categoriasPrincipais.map((cat) => (
+                        <option key={cat.id} value={cat.nome}>
+                          {cat.icone} {cat.nome}
                         </option>
-                      ));
-                    })()}
-                  </select>
-                </div>
-              </div>
+                      ))}
+                    </select>
+                  </div>
 
-              <div style={{ marginBottom: '12px' }}>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '700', marginBottom: '4px', color: 'var(--texto-secundario, #334155)' }}>Atalho Rápido (opcional)</label>
-                <input
-                  type="text"
-                  placeholder="/pix, /extravio"
-                  value={formData.atalho}
-                  onChange={(e) => setFormData({ ...formData, atalho: e.target.value })}
-                  style={{ width: '100%', padding: '9px', borderRadius: '6px', border: '1px solid var(--border-search, #CBD5E1)', background: 'var(--bg-input, #FFF)', color: 'var(--texto-primario, #1E293B)', outline: 'none' }}
-                />
-              </div>
-
-              <div style={{ marginBottom: '16px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                  <label style={{ fontSize: '0.8rem', fontWeight: '700', color: 'var(--texto-secundario, #334155)' }}>
-                    Texto (Use <span style={{ color: 'var(--texto-destaque-turquesa, #006968)' }}>{'{prazo_retorno}'}</span>)
-                  </label>
-                  
-                  {/* BARRA DE FERRAMENTAS DO EDITOR */}
-                  <div className="toolbar-rich-text" style={{ display: 'flex', gap: '4px' }}>
-                    <button type="button" onMouseDown={(e) => handleFormatCommand(e, 'bold')} title="Negrito (Ctrl+B)"><b>B</b></button>
-                    <button type="button" onMouseDown={(e) => handleFormatCommand(e, 'italic')} title="Itálico (Ctrl+I)"><i>I</i></button>
-                    <button type="button" onMouseDown={(e) => handleFormatCommand(e, 'underline')} title="Sublinhado (Ctrl+U)"><u>U</u></button>
-                    <button type="button" onMouseDown={(e) => handleFormatCommand(e, 'insertUnorderedList')} title="Criar Lista"><b>•</b> Lista</button>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '700', marginBottom: '4px', color: 'var(--texto-secundario, #334155)' }}>Subcategoria (Opcional)</label>
+                    <select
+                      value={formData.sub}
+                      onChange={(e) => setFormData({ ...formData, sub: e.target.value })}
+                      style={{ width: '100%', padding: '9px', borderRadius: '6px', border: '1px solid var(--border-search, #CBD5E1)', background: 'var(--bg-input, #FFF)', color: 'var(--texto-primario, #1E293B)' }}
+                    >
+                      <option value="">Nenhuma (Fica na raiz)</option>
+                      {(() => {
+                        const catPai = categoriasPrincipais.find(
+                          (cp) =>
+                            normalizar(cp.nome) === normalizar(formData.c) ||
+                            normalizar(cp.nome).includes(normalizar(formData.c)) ||
+                            normalizar(formData.c).includes(normalizar(cp.nome))
+                        );
+                        if (!catPai) return null;
+                        const subs = subcategoriasPorPai[catPai.id] || [];
+                        return subs.map((sub) => (
+                          <option key={sub.id} value={sub.nome}>
+                            {sub.icone} {sub.nome}
+                          </option>
+                        ));
+                      })()}
+                    </select>
                   </div>
                 </div>
 
-                {/* CAIXA DE TEXTO RICH TEXT COM INTERCEPTADOR DE PASTE (FONTES) E VISUALIZAÇÃO AMPLIADA */}
-                <div
-                  ref={editorRichTextRef}
-                  contentEditable
-                  suppressContentEditableWarning
-                  onPaste={handlePasteRichText}
-                  title="Dica: Cole usando Ctrl+V para manter estilos ou Ctrl+Shift+V para colar texto puro."
-                  style={{
-                    width: '100%',
-                    minHeight: '220px',
-                    maxHeight: '420px',
-                    padding: '10px 14px',
-                    borderRadius: '6px',
-                    border: '1px solid var(--border-search, #CBD5E1)',
-                    background: 'var(--bg-input, #FFF)',
-                    color: 'var(--texto-primario, #1E293B)',
-                    fontSize: '0.88rem',
-                    lineHeight: '1.5',
-                    outline: 'none',
-                    overflowY: 'auto',
-                    whiteSpace: 'pre-wrap'
-                  }}
-                />
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '700', marginBottom: '4px', color: 'var(--texto-secundario, #334155)' }}>Atalho Rápido (opcional)</label>
+                  <input
+                    type="text"
+                    placeholder="/pix, /extravio"
+                    value={formData.atalho}
+                    onChange={(e) => setFormData({ ...formData, atalho: e.target.value })}
+                    style={{ width: '100%', padding: '9px', borderRadius: '6px', border: '1px solid var(--border-search, #CBD5E1)', background: 'var(--bg-input, #FFF)', color: 'var(--texto-primario, #1E293B)', outline: 'none' }}
+                  />
+                </div>
+
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <label style={{ fontSize: '0.8rem', fontWeight: '700', color: 'var(--texto-secundario, #334155)' }}>
+                      Texto (Use <span style={{ color: 'var(--texto-destaque-turquesa, #006968)' }}>{'{prazo_retorno}'}</span>)
+                    </label>
+                    
+                    {/* BARRA DE FERRAMENTAS DO EDITOR */}
+                    <div className="toolbar-rich-text" style={{ display: 'flex', gap: '4px' }}>
+                      <button type="button" onMouseDown={(e) => handleFormatCommand(e, 'bold')} title="Negrito (Ctrl+B)"><b>B</b></button>
+                      <button type="button" onMouseDown={(e) => handleFormatCommand(e, 'italic')} title="Itálico (Ctrl+I)"><i>I</i></button>
+                      <button type="button" onMouseDown={(e) => handleFormatCommand(e, 'underline')} title="Sublinhado (Ctrl+U)"><u>U</u></button>
+                      <button type="button" onMouseDown={(e) => handleFormatCommand(e, 'insertUnorderedList')} title="Criar Lista"><b>•</b> Lista</button>
+                    </div>
+                  </div>
+
+                  {/* CAIXA DE TEXTO RICH TEXT */}
+                  <div
+                    ref={editorRichTextRef}
+                    contentEditable
+                    suppressContentEditableWarning
+                    onPaste={handlePasteRichText}
+                    title="Dica: Cole usando Ctrl+V para manter estilos ou Ctrl+Shift+V para colar texto puro."
+                    style={{
+                      width: '100%',
+                      minHeight: '180px',
+                      maxHeight: '340px',
+                      padding: '10px 14px',
+                      borderRadius: '6px',
+                      border: '1px solid var(--border-search, #CBD5E1)',
+                      background: 'var(--bg-input, #FFF)',
+                      color: 'var(--texto-primario, #1E293B)',
+                      fontSize: '0.88rem',
+                      lineHeight: '1.5',
+                      outline: 'none',
+                      overflowY: 'auto',
+                      whiteSpace: 'pre-wrap'
+                    }}
+                  />
+                </div>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+              {/* RODAPÉ FIXO COM OS BOTÕES SEMPRE ACESSÍVEIS */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', paddingTop: '14px', marginTop: '10px', borderTop: '1px solid var(--border-card, #E2E8F0)', flexShrink: 0 }}>
                 <button type="button" onClick={() => setModalAberto(false)} style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid var(--border-card)', background: 'transparent', color: 'var(--texto-secundario, #64748B)', cursor: 'pointer', fontWeight: '600' }}>Cancelar</button>
                 <button type="submit" style={{ padding: '8px 20px', borderRadius: '6px', border: 'none', background: '#006968', color: '#FFF', fontWeight: '700', cursor: 'pointer' }}>
                   {formData.id ? 'Atualizar no Banco' : 'Salvar no Banco'}
@@ -1916,8 +1987,8 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
 
       {/* MODAL 3: CRIAR CATEGORIA / SUBCATEGORIA */}
       {isMounted && modalCategoria && createPortal(
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0, 20, 20, 0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
-          <div style={{ background: 'var(--bg-card, #FFFFFF)', borderRadius: '16px', width: '100%', maxWidth: '480px', padding: '28px', border: '1px solid var(--border-card, transparent)', boxShadow: '0 20px 40px rgba(0,0,0,0.25)' }}>
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0, 20, 20, 0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px', overflowY: 'auto' }}>
+          <div style={{ background: 'var(--bg-card, #FFFFFF)', borderRadius: '16px', width: '100%', maxWidth: '480px', maxHeight: '92vh', overflowY: 'auto', padding: '28px', border: '1px solid var(--border-card, transparent)', boxShadow: '0 20px 40px rgba(0,0,0,0.25)' }}>
             <h3 style={{ margin: '0 0 16px 0', color: 'var(--texto-titulo-verde, #004D4C)' }}>
               📁 Criar Nova Categoria no Banco
             </h3>
