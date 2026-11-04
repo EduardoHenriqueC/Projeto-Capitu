@@ -13,6 +13,9 @@ const normalizar = (str) =>
     .replace(/[^\w\s]/gi, '')
     .trim();
 
+// Remove tags HTML para gerar um índice de busca limpo
+const stripHtml = (html) => (html || '').replace(/<[^>]*>?/gm, '');
+
 // =====================================================================
 // MOTOR DE CÁLCULO DE DIAS ÚTEIS E FERIADOS (COM CACHE DE MÓDULO)
 // =====================================================================
@@ -241,9 +244,10 @@ const CardColinha = memo(function CardColinha({
         {colinha.t}
       </h4>
 
-      {/* BLOCO DE TEXTO BLINDADO: Sem rolagem horizontal */}
+      {/* BLOCO DE TEXTO BLINDADO RICH TEXT */}
       <div
         className="card-texto-corpo"
+        dangerouslySetInnerHTML={{ __html: colinha.txtCompilado }}
         style={{
           fontSize: '0.86rem',
           color: '#334155',
@@ -255,10 +259,8 @@ const CardColinha = memo(function CardColinha({
           overflow: 'hidden',
           position: 'relative'
         }}
-      >
-        {colinha.txtCompilado}
-        <div className="card-gradiente-fade" style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '36px', background: `linear-gradient(transparent, ${cores.bg})`, pointerEvents: 'none' }} />
-      </div>
+      />
+      <div className="card-gradiente-fade" style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '36px', background: `linear-gradient(transparent, ${cores.bg})`, pointerEvents: 'none' }} />
 
       <div className="card-link-expandir" style={{ marginTop: '14px', paddingTop: '10px', borderTop: '1px dashed rgba(0, 0, 0, 0.1)', textAlign: 'right', fontSize: '0.76rem', fontWeight: '700', color: '#006968' }}>
         Clique para expandir nota 🔍
@@ -280,27 +282,25 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
   const [filtroAtivo, setFiltroAtivo] = useState({ tipo: 'todas', id: 'todas', nome: 'Todas as Colinhas', parentId: null });
   const [expandidas, setExpandidas] = useState({});
 
-  // Edição inline de Categorias / Subcategorias (Ícone + Nome)
+  // Edição inline de Categorias / Subcategorias
   const [editandoCatId, setEditandoCatId] = useState(null);
   const [nomeEditando, setNomeEditando] = useState('');
   const [iconeEditando, setIconeEditando] = useState('');
   const salvandoCatRef = useRef(false);
 
-  // Controle de Drag and Drop (Arrastar e Soltar)
+  // Controle de Drag and Drop
   const dragItemRef = useRef(null);
   const [itemArrastandoId, setItemArrastandoId] = useState(null);
 
-  // Toast
+  // Toast e Modais
   const [toast, setToast] = useState({ visivel: false, mensagem: '', tipo: 'sucesso' });
-  
-  // Modais
   const [modalAberto, setModalAberto] = useState(false);
   const [modalNota, setModalNota] = useState(null); 
   const [colinhaParaExcluir, setColinhaParaExcluir] = useState(null);
   const [excluindo, setExcluindo] = useState(false);
   const [modalCategoria, setModalCategoria] = useState(false);
 
-  // Formulário de Colinhas
+  // Formulário de Colinhas e Refs
   const [formData, setFormData] = useState({
     id: null,
     t: '',
@@ -309,6 +309,10 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
     atalho: '',
     txt: ''
   });
+  const editorRichTextRef = useRef(null);
+  const modalContainerRef = useRef(null);
+  const modalTextRef = useRef(null);
+  const [colinhas, setColinhas] = useState([]);
 
   // Formulário de Categorias
   const [formCat, setFormCat] = useState({
@@ -318,13 +322,33 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
     parentId: ''
   });
 
-  const modalContainerRef = useRef(null);
-  const modalTextRef = useRef(null);
-  const [colinhas, setColinhas] = useState([]);
-
   const dispararToast = (mensagem, tipo = 'sucesso') => {
     setToast({ visivel: true, mensagem, tipo });
     setTimeout(() => setToast({ visivel: false, mensagem: '', tipo: 'sucesso' }), 2800);
+  };
+
+  const copiarComFormatacao = (htmlStr) => {
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = htmlStr;
+    tempDiv.style.position = 'absolute';
+    tempDiv.style.left = '-9999px';
+    document.body.appendChild(tempDiv);
+
+    const range = document.createRange();
+    range.selectNodeContents(tempDiv);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+
+    try {
+      document.execCommand('copy');
+      dispararToast(`📋 Colinha copiada com formatação!`, 'sucesso');
+    } catch (err) {
+      console.error('Erro ao copiar formatação: ', err);
+      dispararToast('Erro ao copiar. Tente selecionar manualmente.', 'erro');
+    }
+    
+    document.body.removeChild(tempDiv);
   };
 
   const getCor = (catNome) => {
@@ -387,7 +411,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
           atualizadoEm: item.atualizado_em || item.criado_em || item.created_at || item.id,
           cNorm: normalizar(item.categoria),
           subNorm: normalizar(item.subcategoria || ''),
-          buscaIndex: normalizar(`${item.titulo} ${item.conteudo} ${item.atalho || ''}`)
+          buscaIndex: normalizar(`${item.titulo} ${stripHtml(item.conteudo)} ${item.atalho || ''}`)
         }));
         setColinhas(processadas);
       }
@@ -418,6 +442,15 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
     }
   }, [modalNota]);
 
+  // Sincroniza o ref do editor quando o modal de criar/editar é aberto
+  useEffect(() => {
+    if (modalAberto && editorRichTextRef.current) {
+      if (editorRichTextRef.current.innerHTML !== formData.txt) {
+        editorRichTextRef.current.innerHTML = formData.txt || '';
+      }
+    }
+  }, [modalAberto, formData.id]);
+
   const { categoriasPrincipais, subcategoriasPorPai } = useMemo(() => {
     const principais = [];
     const subsMap = {};
@@ -431,7 +464,6 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
       }
     });
 
-    // Garante ordenação também para as subcategorias de cada categoria pai
     Object.keys(subsMap).forEach((paiId) => {
       subsMap[paiId].sort((a, b) => (a.ordem ?? a.id) - (b.ordem ?? b.id));
     });
@@ -467,7 +499,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
     }
   };
 
-  // CONTROLE DE EDIÇÃO DE CATEGORIAS E SUBCATEGORIAS (ÍCONE + NOME)
+  // CONTROLE DE EDIÇÃO DE CATEGORIAS E SUBCATEGORIAS
   const iniciarEdicao = (e, cat) => {
     if (e) e.stopPropagation();
     setEditandoCatId(cat.id);
@@ -501,7 +533,6 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
 
     salvandoCatRef.current = true;
     try {
-      // 1. Atualiza na tabela categorias_colinhas
       const { error: errCat } = await supabase
         .from('categorias_colinhas')
         .update({ nome: novoNome, icone: novoIcone })
@@ -509,44 +540,26 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
 
       if (errCat) throw errCat;
 
-      // 2. Se mudou de nome, atualiza em cascata nas colinhas vinculadas
       if (mudouNome) {
         if (tipo === 'principal') {
-          await supabase
-            .from('colinhas')
-            .update({ categoria: novoNome })
-            .eq('categoria', cat.nome);
+          await supabase.from('colinhas').update({ categoria: novoNome }).eq('categoria', cat.nome);
         } else {
-          await supabase
-            .from('colinhas')
-            .update({ subcategoria: novoNome })
-            .eq('subcategoria', cat.nome);
+          await supabase.from('colinhas').update({ subcategoria: novoNome }).eq('subcategoria', cat.nome);
         }
       }
 
-      // 3. Atualiza estado em memória das categorias
       setCategorias((prev) =>
         prev.map((item) => (item.id === cat.id ? { ...item, nome: novoNome, icone: novoIcone } : item))
       );
 
-      // 4. Se mudou o nome, atualiza estado em memória das colinhas
       if (mudouNome) {
         setColinhas((prev) =>
           prev.map((item) => {
             if (tipo === 'principal' && (item.c === cat.nome || item.cNorm === normalizar(cat.nome))) {
-              return {
-                ...item,
-                c: novoNome,
-                cNorm: normalizar(novoNome),
-                buscaIndex: normalizar(`${item.t} ${item.txt} ${item.atalho || ''}`)
-              };
+              return { ...item, c: novoNome, cNorm: normalizar(novoNome), buscaIndex: normalizar(`${item.t} ${stripHtml(item.txt)} ${item.atalho || ''}`) };
             }
             if (tipo === 'subcategoria' && (item.sub === cat.nome || item.subNorm === normalizar(cat.nome))) {
-              return {
-                ...item,
-                sub: novoNome,
-                subNorm: normalizar(novoNome)
-              };
+              return { ...item, sub: novoNome, subNorm: normalizar(novoNome) };
             }
             return item;
           })
@@ -557,12 +570,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
         }
       }
 
-      dispararToast(
-        tipo === 'principal'
-          ? `📁 Categoria atualizada!`
-          : `📂 Subcategoria atualizada!`,
-        'sucesso'
-      );
+      dispararToast(tipo === 'principal' ? `📁 Categoria atualizada!` : `📂 Subcategoria atualizada!`, 'sucesso');
     } catch (err) {
       console.error('Erro ao atualizar categoria:', err);
       dispararToast('Erro ao atualizar: ' + err.message, 'erro');
@@ -581,14 +589,9 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
 
   const abrirModalEditar = (e, item) => {
     if (e) e.stopPropagation();
-
     const catEncontrada = categoriasPrincipais.find(
-      (cp) =>
-        normalizar(cp.nome) === item.cNorm ||
-        normalizar(cp.nome).includes(item.cNorm) ||
-        item.cNorm.includes(normalizar(cp.nome))
+      (cp) => normalizar(cp.nome) === item.cNorm || normalizar(cp.nome).includes(item.cNorm) || item.cNorm.includes(normalizar(cp.nome))
     );
-
     setFormData({
       id: item.id,
       t: item.t,
@@ -600,9 +603,66 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
     setModalAberto(true);
   };
 
+  // Tratamento Nativo do Copiar & Colar Limpo
+  const handlePasteRichText = (e) => {
+    e.preventDefault();
+
+    let content = '';
+    // Se usou Ctrl+Shift+V ou se não tiver HTML (texto puro)
+    if (e.clipboardData.types.includes('text/plain') && !e.clipboardData.types.includes('text/html')) {
+      content = e.clipboardData.getData('text/plain');
+      document.execCommand('insertText', false, content);
+      return;
+    }
+
+    // Se usou Ctrl+V com HTML (de Word, outro site, etc)
+    content = e.clipboardData.getData('text/html');
+    if (!content) {
+      content = e.clipboardData.getData('text/plain');
+      document.execCommand('insertText', false, content);
+      return;
+    }
+
+    // Limpeza forçada de fontes e tamanhos para padronizar visualmente
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = content;
+    
+    const elements = tempDiv.querySelectorAll('*');
+    elements.forEach(el => {
+      el.style.fontFamily = '';
+      el.style.fontSize = '';
+      el.style.lineHeight = '';
+      el.style.color = '';
+      el.style.backgroundColor = '';
+      el.removeAttribute('class');
+      
+      // Limpa tags desnecessárias (ex: metas do Word, spans vazios)
+      if (el.tagName === 'SPAN' && !el.getAttribute('style') && !el.className) {
+        const parent = el.parentNode;
+        while (el.firstChild) parent.insertBefore(el.firstChild, el);
+        parent.removeChild(el);
+      }
+    });
+
+    document.execCommand('insertHTML', false, tempDiv.innerHTML);
+  };
+
+  // Botões do Toolbar do Rich Text
+  const handleFormatCommand = (e, cmd) => {
+    e.preventDefault();
+    document.execCommand(cmd, false, null);
+    if (editorRichTextRef.current) {
+      editorRichTextRef.current.focus();
+    }
+  };
+
   const salvarColinha = async (e) => {
     e.preventDefault();
-    if (!formData.t.trim() || !formData.txt.trim() || !formData.c) {
+    
+    // Captura o HTML com a formatação gerada no div contentEditable
+    const conteudoHTML = editorRichTextRef.current ? editorRichTextRef.current.innerHTML : formData.txt;
+
+    if (!formData.t.trim() || !stripHtml(conteudoHTML).trim() || !formData.c) {
       dispararToast('Preencha título, categoria e conteúdo.', 'erro');
       return;
     }
@@ -615,7 +675,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
             titulo: formData.t,
             categoria: formData.c,
             subcategoria: formData.sub ? formData.sub.trim() : null,
-            conteudo: formData.txt,
+            conteudo: conteudoHTML,
             atalho: formData.atalho || '',
             atualizado_em: new Date().toISOString()
           })
@@ -632,7 +692,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
               titulo: formData.t,
               categoria: formData.c,
               subcategoria: formData.sub ? formData.sub.trim() : null,
-              conteudo: formData.txt,
+              conteudo: conteudoHTML,
               atalho: formData.atalho || '',
               autor_nome: autor,
               fixado: false,
@@ -658,7 +718,6 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
     try {
       const { error } = await supabase.from('colinhas').delete().eq('id', colinhaParaExcluir.id);
       if (error) throw error;
-
       dispararToast(`Colinha "${colinhaParaExcluir.t}" removida!`, 'sucesso');
       setColinhaParaExcluir(null);
       await buscarColinhas();
@@ -694,9 +753,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
       if (error) throw error;
 
       dispararToast(
-        formCat.tipo === 'subcategoria'
-          ? '📂 Subcategoria criada com sucesso!'
-          : '📁 Categoria criada com sucesso!',
+        formCat.tipo === 'subcategoria' ? '📂 Subcategoria criada com sucesso!' : '📁 Categoria criada com sucesso!',
         'sucesso'
       );
       setModalCategoria(false);
@@ -715,7 +772,6 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
     try {
       const { error } = await supabase.from('categorias_colinhas').delete().eq('id', id);
       if (error) throw error;
-
       dispararToast(`Categoria "${nome}" removida!`, 'sucesso');
       if (filtroAtivo.id === id) {
         setFiltroAtivo({ tipo: 'todas', id: 'todas', nome: 'Todas as Colinhas', parentId: null });
@@ -727,15 +783,22 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
     }
   };
 
-  // ORDENAÇÃO POR FIXAÇÃO
+  // ORDENAÇÃO E FILTRAGEM (Pesquisa Global Independente de Categoria)
   const colinhasFiltradas = useMemo(() => {
     const termo = normalizar(termoBusca);
     const filtroNomeNorm = normalizar(filtroAtivo.nome);
 
     return colinhas
       .filter((c) => {
-        let bateCategoria = true;
+        const bateBusca = termo === '' || c.buscaIndex.includes(termo);
 
+        // Se estiver pesquisando, ignora as pastas e varre tudo globalmente
+        if (termo !== '') {
+          return bateBusca;
+        }
+
+        // Se não estiver pesquisando, aplica o filtro normal da pasta
+        let bateCategoria = true;
         if (filtroAtivo.tipo === 'principal') {
           if (!c.c || !c.cNorm) {
             bateCategoria = false;
@@ -750,24 +813,18 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
           if (!c.sub || !c.subNorm) {
             bateCategoria = false;
           } else {
-            bateCategoria =
-              c.sub === filtroAtivo.nome ||
-              c.subNorm === filtroNomeNorm;
+            bateCategoria = c.sub === filtroAtivo.nome || c.subNorm === filtroNomeNorm;
           }
         }
-
-        const bateBusca = termo === '' || c.buscaIndex.includes(termo);
         return bateCategoria && bateBusca;
       })
       .sort((a, b) => {
         if (a.fixado !== b.fixado) return b.fixado ? 1 : -1;
-
         if (a.fixado && b.fixado) {
           const dataA = new Date(a.atualizadoEm || 0).getTime();
           const dataB = new Date(b.atualizadoEm || 0).getTime();
           if (dataB !== dataA) return dataB - dataA;
         }
-
         return a.t.localeCompare(b.t);
       });
   }, [colinhas, filtroAtivo, termoBusca]);
@@ -794,10 +851,37 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
           word-break: break-word !important;
           overflow-wrap: anywhere !important;
         }
+        .card-texto-corpo b, .card-texto-corpo strong {
+          font-weight: 800;
+        }
+        .card-texto-corpo ul, .modal-nota-texto ul, [contenteditable] ul {
+          margin: 6px 0;
+          padding-left: 20px;
+          list-style-type: disc;
+        }
+        .card-texto-corpo li, .modal-nota-texto li, [contenteditable] li {
+          margin-bottom: 4px;
+        }
         .btn-excluir-hover:hover {
           background-color: #FEE2E2 !important;
           color: #DC2626 !important;
           border-color: #FCA5A5 !important;
+        }
+        
+        .toolbar-rich-text button {
+          background: #FFFFFF;
+          border: 1px solid var(--border-search, #CBD5E1);
+          border-radius: 4px;
+          cursor: pointer;
+          padding: 4px 10px;
+          color: var(--texto-secundario, #334155);
+          font-size: 0.88rem;
+          transition: all 0.15s ease;
+        }
+        .toolbar-rich-text button:hover {
+          background: var(--bg-item-aberto, #F1F5F9);
+          color: #006968;
+          border-color: #006968;
         }
 
         /* REGRAS EXCLUSIVAS DE MODO ESCURO */
@@ -841,6 +925,11 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
           border-color: var(--border-card, #1E3545) !important;
           color: var(--texto-secundario, #CBD5E1) !important;
         }
+        [data-theme="dark"] .toolbar-rich-text button {
+          background-color: var(--bg-input, #0F1A22);
+          border-color: var(--border-card, #1E3545);
+          color: var(--texto-secundario, #CBD5E1);
+        }
       `}</style>
 
       {/* BARRA SUPERIOR DE PESQUISA */}
@@ -857,7 +946,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
         flexWrap: 'wrap',
         gap: '16px'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: 1, minWidth: '300px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: 1, minWidth: '300px', position: 'relative' }}>
           <span style={{ fontSize: '1.25rem', color: '#2DD4BF' }}>🔍</span>
           <input
             type="text"
@@ -871,9 +960,34 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
               width: '100%',
               fontWeight: '500',
               backgroundColor: 'transparent',
-              color: 'var(--text-search, #1E293B)'
+              color: 'var(--text-search, #1E293B)',
+              paddingRight: '30px'
             }}
           />
+          {termoBusca && (
+            <button
+              onClick={() => setTermoBusca('')}
+              title="Limpar pesquisa"
+              style={{
+                position: 'absolute',
+                right: '0',
+                background: 'rgba(0,0,0,0.05)',
+                border: 'none',
+                borderRadius: '50%',
+                width: '24px',
+                height: '24px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                color: 'var(--texto-secundario, #64748B)',
+                fontSize: '0.8rem',
+                fontWeight: '800'
+              }}
+            >
+              ✕
+            </button>
+          )}
         </div>
 
         {isSupervisor && (
@@ -915,7 +1029,10 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
         }}>
           
           <button
-            onClick={() => setFiltroAtivo({ tipo: 'todas', id: 'todas', nome: 'Todas as Colinhas', parentId: null })}
+            onClick={() => {
+              setTermoBusca(''); // Limpa a barra de pesquisa ao trocar de categoria
+              setFiltroAtivo({ tipo: 'todas', id: 'todas', nome: 'Todas as Colinhas', parentId: null });
+            }}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -984,14 +1101,12 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
                   const [removido] = novasPrincipais.splice(sourceIdx, 1);
                   novasPrincipais.splice(targetIdx, 0, removido);
 
-                  // Atualização otimista imediata na memória
                   setCategorias((prev) => {
                     const subs = prev.filter((c) => Boolean(c.parent_id));
                     const reordenadas = novasPrincipais.map((c, idx) => ({ ...c, ordem: idx }));
                     return [...reordenadas, ...subs];
                   });
 
-                  // Persistência com verificação estrita de erros no banco
                   try {
                     const updates = novasPrincipais.map((c, idx) =>
                       supabase.from('categorias_colinhas').update({ ordem: idx }).eq('id', c.id)
@@ -1001,7 +1116,6 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
                     if (erroEncontrado) {
                       throw erroEncontrado.error;
                     }
-
                     dispararToast('Posição das categorias salva no banco!', 'sucesso');
                   } catch (err) {
                     console.error('Erro ao salvar nova ordem:', err);
@@ -1012,6 +1126,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
               >
                 <div
                   onClick={() => {
+                    setTermoBusca(''); // Limpa a barra de pesquisa
                     if (isAtiva && subs.length > 0) {
                       setExpandidas((prev) => ({ ...prev, [cat.id]: !isOpen }));
                     } else {
@@ -1042,7 +1157,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
                       </span>
                     )}
 
-                    {/* EDIÇÃO INLINE: ÍCONE + NOME DA CATEGORIA PRINCIPAL */}
+                    {/* EDIÇÃO INLINE */}
                     {editandoCatId === cat.id ? (
                       <div
                         style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0 }}
@@ -1238,7 +1353,6 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
                             const [removido] = novasSubs.splice(sourceIdx, 1);
                             novasSubs.splice(targetIdx, 0, removido);
 
-                            // Atualização otimista
                             setCategorias((prev) =>
                               prev.map((c) => {
                                 const idx = novasSubs.findIndex((ns) => ns.id === c.id);
@@ -1249,7 +1363,6 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
                               })
                             );
 
-                            // Persistência com verificação estrita de erros no banco
                             try {
                               const updates = novasSubs.map((s, idx) =>
                                 supabase.from('categorias_colinhas').update({ ordem: idx }).eq('id', s.id)
@@ -1259,7 +1372,6 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
                               if (erroEncontrado) {
                                 throw erroEncontrado.error;
                               }
-
                               dispararToast('Posição das subcategorias salva no banco!', 'sucesso');
                             } catch (err) {
                               console.error('Erro ao salvar ordem de subcategorias:', err);
@@ -1271,6 +1383,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
                           <div
                             onClick={(e) => {
                               e.stopPropagation();
+                              setTermoBusca(''); // Limpa a barra de pesquisa
                               setExpandidas((prev) => ({ ...prev, [cat.id]: true }));
                               setFiltroAtivo({ tipo: 'subcategoria', id: sub.id, nome: sub.nome, parentId: cat.id });
                             }}
@@ -1297,7 +1410,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
                                 </span>
                               )}
 
-                              {/* EDIÇÃO INLINE: ÍCONE + NOME DA SUBCATEGORIA */}
+                              {/* EDIÇÃO INLINE DA SUBCATEGORIA */}
                               {editandoCatId === sub.id ? (
                                 <div
                                   style={{ display: 'flex', alignItems: 'center', gap: '4px', flex: 1, minWidth: 0 }}
@@ -1462,7 +1575,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
         <main style={{ minHeight: '600px', minWidth: 0 }}>
           <div style={{ marginBottom: '20px' }}>
             <h2 style={{ fontSize: '1.4rem', fontWeight: '800', color: 'var(--texto-titulo-verde, #004D4C)', margin: '0 0 6px 0' }}>
-              {filtroAtivo.nome}
+              {termoBusca ? 'Resultados da Pesquisa' : filtroAtivo.nome}
             </h2>
             <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--texto-secundario, #64748B)' }}>
               {colinhasFiltradas.length} {colinhasFiltradas.length === 1 ? 'colinha disponível' : 'colinhas disponíveis'}.
@@ -1579,9 +1692,11 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
               </button>
             </div>
 
+            {/* CONTEÚDO RICH TEXT DA NOTA */}
             <div
               ref={modalTextRef}
               className="modal-nota-texto"
+              dangerouslySetInnerHTML={{ __html: modalNota.txtCompilado }}
               style={{
                 background: getCor(modalNota.c).bg,
                 padding: '22px',
@@ -1598,9 +1713,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
                 overflowX: 'hidden',
                 flex: 1
               }}
-            >
-              {modalNota.txtCompilado}
-            </div>
+            />
 
             <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
               <div>
@@ -1651,10 +1764,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
                 )}
 
                 <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(modalNota.txtCompilado);
-                    dispararToast(`📋 Texto de "${modalNota.t}" copiado!`, 'sucesso');
-                  }}
+                  onClick={() => copiarComFormatacao(modalNota.txtCompilado)}
                   style={{
                     padding: '8px 22px',
                     borderRadius: '8px',
@@ -1675,7 +1785,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
         document.body
       )}
 
-      {/* MODAL 2: CRIAR / EDITAR / MOVER */}
+      {/* MODAL 2: CRIAR / EDITAR / MOVER (COM RICH TEXT E LISTA) */}
       {isMounted && modalAberto && createPortal(
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0, 20, 20, 0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
           <div style={{ background: 'var(--bg-card, #FFFFFF)', borderRadius: '16px', width: '100%', maxWidth: '600px', padding: '28px', border: '1px solid var(--border-card, transparent)', boxShadow: '0 20px 40px rgba(0,0,0,0.25)' }}>
@@ -1753,16 +1863,42 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
               </div>
 
               <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '700', marginBottom: '4px', color: 'var(--texto-secundario, #334155)' }}>
-                  Texto da Colinha (Use <span style={{ color: 'var(--texto-destaque-turquesa, #006968)' }}>{'{prazo_retorno}'}</span> para calcular 2 dias úteis)
-                </label>
-                <textarea
-                  rows="7"
-                  required
-                  placeholder="Olá! Seu pedido está em trânsito..."
-                  value={formData.txt}
-                  onChange={(e) => setFormData({ ...formData, txt: e.target.value })}
-                  style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid var(--border-search, #CBD5E1)', background: 'var(--bg-input, #FFF)', color: 'var(--texto-primario, #1E293B)', fontSize: '0.88rem', lineHeight: '1.5', outline: 'none' }}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                  <label style={{ fontSize: '0.8rem', fontWeight: '700', color: 'var(--texto-secundario, #334155)' }}>
+                    Texto (Use <span style={{ color: 'var(--texto-destaque-turquesa, #006968)' }}>{'{prazo_retorno}'}</span>)
+                  </label>
+                  
+                  {/* BARRA DE FERRAMENTAS DO EDITOR */}
+                  <div className="toolbar-rich-text" style={{ display: 'flex', gap: '4px' }}>
+                    <button type="button" onMouseDown={(e) => handleFormatCommand(e, 'bold')} title="Negrito (Ctrl+B)"><b>B</b></button>
+                    <button type="button" onMouseDown={(e) => handleFormatCommand(e, 'italic')} title="Itálico (Ctrl+I)"><i>I</i></button>
+                    <button type="button" onMouseDown={(e) => handleFormatCommand(e, 'underline')} title="Sublinhado (Ctrl+U)"><u>U</u></button>
+                    <button type="button" onMouseDown={(e) => handleFormatCommand(e, 'insertUnorderedList')} title="Criar Lista"><b>•</b> Lista</button>
+                  </div>
+                </div>
+
+                {/* CAIXA DE TEXTO RICH TEXT COM INTERCEPTADOR DE PASTE (FONTES) E VISUALIZAÇÃO AMPLIADA */}
+                <div
+                  ref={editorRichTextRef}
+                  contentEditable
+                  suppressContentEditableWarning
+                  onPaste={handlePasteRichText}
+                  title="Dica: Cole usando Ctrl+V para manter estilos ou Ctrl+Shift+V para colar texto puro."
+                  style={{
+                    width: '100%',
+                    minHeight: '220px',
+                    maxHeight: '420px',
+                    padding: '10px 14px',
+                    borderRadius: '6px',
+                    border: '1px solid var(--border-search, #CBD5E1)',
+                    background: 'var(--bg-input, #FFF)',
+                    color: 'var(--texto-primario, #1E293B)',
+                    fontSize: '0.88rem',
+                    lineHeight: '1.5',
+                    outline: 'none',
+                    overflowY: 'auto',
+                    whiteSpace: 'pre-wrap'
+                  }}
                 />
               </div>
 
