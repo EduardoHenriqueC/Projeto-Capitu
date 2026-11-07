@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useMemo, memo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback, useDeferredValue, memo } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
 
@@ -16,16 +16,27 @@ const normalizar = (str) =>
 // Remove tags HTML para gerar um índice de busca limpo
 const stripHtml = (html) => (html || '').replace(/<[^>]*>?/gm, '');
 
-// Higieniza rigorosamente o início do texto removendo qualquer espaço, &nbsp; ou tag vazia da primeira linha
+// Caracteres "invisíveis" que viram um espaço/recuo ao colar no e-mail:
+// espaço comum, &nbsp; ( ), espaços tipográficos, zero-width (​-‍, ⁠) e BOM (﻿)
+const INVISIVEIS = '\\s\\p{Z}\\p{Cf}\\p{Cc}\\u034F\\u115F\\u1160\\u180E\\u2800\\u3164\\uFFA0';
+const RE_INICIO_INVISIVEL = new RegExp(`^[${INVISIVEIS}]+`, 'u');
+const RE_TAG_VAZIA_INICIAL = new RegExp(
+  `^(?:<p[^>]*>[${INVISIVEIS}]*(?:<br\\s*/?>|&nbsp;)?[${INVISIVEIS}]*</p>|<div[^>]*>[${INVISIVEIS}]*(?:<br\\s*/?>|&nbsp;)?[${INVISIVEIS}]*</div>|<br\\s*/?>|&nbsp;|&#160;|&#xa0;|[${INVISIVEIS}])+`,
+  'iu'
+);
+const RE_ESPACO_APOS_TAG = new RegExp(`^((?:<[^>]+>)+)(?:[${INVISIVEIS}]|&nbsp;|&#160;)+`, 'iu');
+
+// Higieniza rigorosamente o início do texto removendo qualquer espaço, &nbsp;, caractere invisível ou tag vazia da primeira linha
 const limparEspacosIniciais = (str) => {
   if (!str) return '';
   let res = str.trim();
-  // Remove tags iniciais vazias ou quebras soltas
-  res = res.replace(/^(?:<p>\s*(?:<br\s*\/?>|&nbsp;|\u00A0)?\s*<\/p>|<div>\s*(?:<br\s*\/?>|&nbsp;|\u00A0)?\s*<\/div>|<br\s*\/?>|\s|&nbsp;|\u00A0)+/gi, '');
-  // Remove espaço ou &nbsp; logo após a primeira tag de abertura (ex: <div> Olá -> <div>Olá)
-  res = res.replace(/^((?:<[^>]+>)+)(?:\s|&nbsp;|\u00A0)+/gi, '$1');
-  // Remove caso comece diretamente com espaço ou &nbsp;
-  res = res.replace(/^(?:\s|&nbsp;|\u00A0)+/gi, '');
+  for (let i = 0; i < 4; i++) {
+    const antes = res;
+    res = res.replace(RE_TAG_VAZIA_INICIAL, '');
+    res = res.replace(RE_ESPACO_APOS_TAG, '$1');
+    res = res.replace(RE_INICIO_INVISIVEL, '');
+    if (res === antes) break;
+  }
   return res.trim();
 };
 
@@ -132,20 +143,161 @@ const obterPrazo2DiasUteisFormatado = () => {
   return CACHE_PRAZO_HOJE;
 };
 
+const RE_ME_CHAMO_E = /Me chamo {agente} e /gi;
+const RE_ME_CHAMO = /Me chamo {agente}/gi;
+const RE_AGENTE = /{agente}/gi;
+const RE_ATENCIOSAMENTE = /\n*Atenciosamente,?\s*(\n.*)*$/i;
+const RE_EQUIPE = /\n*Equipe Estante Virtual.*$/i;
+const RE_PRAZO_TAG = /{prazo_retorno}/gi;
+const RE_PRAZO_DATA = /(prazo\s*(?:de)?\s*retorno\s*[:\-]?\s*)\d{1,2}\/\d{1,2}(?:\/\d{2,4})?/gi;
+
 const compilarTextoRapido = (template, dataFormatada) => {
   if (!template) return '';
   const compilado = template
-    .replace(/Me chamo {agente} e /gi, '')
-    .replace(/Me chamo {agente}/gi, 'Aqui é da Equipe Estante Virtual')
-    .replace(/{agente}/gi, '')
-    .replace(/\n*Atenciosamente,?\s*(\n.*)*$/i, '')
-    .replace(/\n*Equipe Estante Virtual.*$/i, '')
-    .replace(/{prazo_retorno}/gi, dataFormatada)
-    .replace(
-      /(prazo\s*(?:de)?\s*retorno\s*[:\-]?\s*)\d{1,2}\/\d{1,2}(?:\/\d{2,4})?/gi,
-      `$1${dataFormatada}`
-    );
+    .replace(RE_ME_CHAMO_E, '')
+    .replace(RE_ME_CHAMO, 'Aqui é da Equipe Estante Virtual')
+    .replace(RE_AGENTE, '')
+    .replace(RE_ATENCIOSAMENTE, '')
+    .replace(RE_EQUIPE, '')
+    .replace(RE_PRAZO_TAG, dataFormatada)
+    .replace(RE_PRAZO_DATA, `$1${dataFormatada}`);
   return limparEspacosIniciais(compilado);
+};
+
+// Cores por categoria (cache: antes era recalculado, com normalize, a cada render de cada card)
+const COR_PADRAO = { bg: '#FFFFFF', border: '#CBD5E1' };
+const REGRAS_COR = [
+  [['relacionamento'], { bg: '#F5EEF8', border: '#D7BDE2' }],
+  [['mascara'], { bg: '#F2F4F4', border: '#D5D8DC' }],
+  [['entrega', 'rastreio'], { bg: '#E8F8F5', border: '#A3E4D7' }],
+  [['atraso', 'extravio'], { bg: '#FEF9E7', border: '#F9E79F' }],
+  [['vendedor', 'standby'], { bg: '#FDF2E9', border: '#F5CBA7' }],
+  [['troca', 'devolu'], { bg: '#F9EBEA', border: '#F2D7D5' }],
+  [['cancelamento', 'reembolso'], { bg: '#FDEDEC', border: '#F5B7B1' }],
+  [['financeiro', 'pagamento'], { bg: '#EAF2F8', border: '#A9CCE3' }],
+  [['cadastro', 'login'], { bg: '#EAFAF1', border: '#A9DFBF' }],
+  [['plataforma', 'carrinho'], { bg: '#F4ECF7', border: '#D2B4DE' }]
+];
+const CACHE_CORES = new Map();
+const getCor = (catNome) => {
+  const chave = catNome || '';
+  const salvo = CACHE_CORES.get(chave);
+  if (salvo) return salvo;
+  const nome = normalizar(chave);
+  let cor = COR_PADRAO;
+  for (const [termos, valor] of REGRAS_COR) {
+    if (termos.some((t) => nome.includes(t))) { cor = valor; break; }
+  }
+  CACHE_CORES.set(chave, cor);
+  return cor;
+};
+
+const colador = new Intl.Collator('pt-BR');
+
+// Cache em memória: ao voltar para a aba Colinhas os dados aparecem na hora e
+// são atualizados em segundo plano. Fica separado por usuário e vale só no dia atual.
+const CACHE_DADOS = { chave: null, dia: null, colinhas: null, categorias: null };
+const chaveDoUsuario = (u) => (u && (u.id || u.email || u.nome)) || null;
+const lerCache = (chave, campo) =>
+  chave && CACHE_DADOS.chave === chave && CACHE_DADOS.dia === new Date().toDateString()
+    ? CACHE_DADOS[campo]
+    : null;
+const gravarCache = (chave, campo, valor) => {
+  if (!chave) return;
+  if (CACHE_DADOS.chave !== chave) {
+    CACHE_DADOS.chave = chave;
+    CACHE_DADOS.colinhas = null;
+    CACHE_DADOS.categorias = null;
+  }
+  CACHE_DADOS.dia = new Date().toDateString();
+  CACHE_DADOS[campo] = valor;
+};
+
+const LOTE_CARDS = 24;
+
+// ---------------------------------------------------------------------
+// CÓPIA PARA E-MAIL
+// Gera HTML e texto limpos, SEM nada no início (espaço, &nbsp;, <br>, zero-width, bloco vazio).
+// ---------------------------------------------------------------------
+const BLOCOS = new Set(['DIV', 'P', 'LI', 'UL', 'OL', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'BLOCKQUOTE', 'TR']);
+
+const textoDoNo = (raiz) => {
+  // innerText não funciona em elemento fora da página (perde as quebras de linha): converte manualmente
+  let out = '';
+  const visitar = (no) => {
+    if (no.nodeType === 3) { out += no.nodeValue; return; }
+    if (no.nodeType !== 1) return;
+    if (no.tagName === 'BR') { out += '\n'; return; }
+    const bloco = BLOCOS.has(no.tagName);
+    if (bloco && out && !out.endsWith('\n')) out += '\n';
+    if (no.tagName === 'LI') out += '• ';
+    no.childNodes.forEach(visitar);
+    if (bloco && out && !out.endsWith('\n')) out += '\n';
+  };
+  visitar(raiz);
+  return out.replace(/ /g, ' ').replace(/\n{3,}/g, '\n\n').replace(RE_INICIO_INVISIVEL, '').replace(/\s+$/, '');
+};
+
+const prepararParaCopia = (htmlStr) => {
+  let html = limparEspacosIniciais((htmlStr || '').replace(/\r\n/g, '\n'));
+  html = html.replace(/<\/div>\s*<div>/gi, '</div><div>');
+  html = html.replace(/<\/p>\s*<p>/gi, '</p><p>');
+  html = html.replace(/<ul[^>]*>\s*<li/gi, '<ul><li');
+  html = html.replace(/<\/li>\s*<li>/gi, '</li><li>');
+  html = html.replace(/<\/li>\s*<\/ul>/gi, '</li></ul>');
+  html = html.replace(/\n/g, '<br>');
+
+  const temp = document.createElement('div');
+  temp.innerHTML = html;
+
+  // Higieniza atributos de estilo que poluem a colagem no email
+  temp.querySelectorAll('*').forEach((el) => {
+    el.removeAttribute('class');
+    el.removeAttribute('id');
+    if (el.hasAttribute('style')) {
+      el.style.backgroundColor = '';
+      el.style.background = '';
+      el.style.fontFamily = '';
+      el.style.fontSize = '';
+      el.style.lineHeight = '';
+      el.style.color = '';
+      if (!el.getAttribute('style') || el.getAttribute('style').trim() === '') el.removeAttribute('style');
+    }
+  });
+
+  // Remove tudo que gera recuo/linha em branco antes da primeira palavra
+  const primeiroTexto = (no) => {
+    const w = document.createTreeWalker(no, NodeFilter.SHOW_TEXT);
+    let t = w.nextNode();
+    while (t && !t.nodeValue.replace(RE_INICIO_INVISIVEL, '')) {
+      t.parentNode.removeChild(t);
+      t = w.nextNode();
+    }
+    return t;
+  };
+  while (temp.firstChild) {
+    const fc = temp.firstChild;
+    if (fc.nodeType === 3) {
+      fc.nodeValue = fc.nodeValue.replace(RE_INICIO_INVISIVEL, '');
+      if (!fc.nodeValue) { temp.removeChild(fc); continue; }
+      break;
+    }
+    if (fc.nodeType === 1) {
+      if (fc.tagName === 'BR') { temp.removeChild(fc); continue; }
+      const dentro = (fc.textContent || '').replace(RE_INICIO_INVISIVEL, '');
+      if (!dentro && !fc.querySelector('img')) { temp.removeChild(fc); continue; }
+      // <br> ou espaços no começo DENTRO do primeiro bloco
+      let f = fc;
+      while (f.firstChild && f.firstChild.nodeType === 1 && f.firstChild.tagName === 'BR') f.removeChild(f.firstChild);
+      const t = primeiroTexto(fc);
+      if (t) t.nodeValue = t.nodeValue.replace(RE_INICIO_INVISIVEL, '');
+      break;
+    }
+    temp.removeChild(fc);
+  }
+
+  const cleanHtml = temp.innerHTML.replace(new RegExp(`^((?:<[^>]+>)*)(?:[${INVISIVEIS}]|&nbsp;)+`, 'iu'), '$1').trim();
+  return { html: cleanHtml, text: textoDoNo(temp) };
 };
 
 // =====================================================================
@@ -288,10 +440,11 @@ const CardColinha = memo(function CardColinha({
 
 export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
   const [isMounted, setIsMounted] = useState(false);
+  const chaveCache = chaveDoUsuario(usuarioLogado);
   const [termoBusca, setTermoBusca] = useState('');
   
   // Categorias do banco
-  const [categorias, setCategorias] = useState([]);
+  const [categorias, setCategorias] = useState(() => lerCache(chaveCache, 'categorias') || []);
   const [filtroAtivo, setFiltroAtivo] = useState({ tipo: 'todas', id: 'todas', nome: 'Todas as Colinhas', parentId: null });
   const [expandidas, setExpandidas] = useState({});
 
@@ -325,7 +478,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
   const editorRichTextRef = useRef(null);
   const modalContainerRef = useRef(null);
   const modalTextRef = useRef(null);
-  const [colinhas, setColinhas] = useState([]);
+  const [colinhas, setColinhas] = useState(() => lerCache(chaveCache, 'colinhas') || []);
 
   // Formulário de Categorias
   const [formCat, setFormCat] = useState({
@@ -362,73 +515,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
   // Cópia higienizada para e-mails: limpa cores, fontes forçadas e remove recuos na primeira linha
   const copiarComFormatacao = async (htmlStr) => {
     if (!htmlStr) return;
-
-    let html = htmlStr.replace(/\r\n/g, '\n');
-    html = html.replace(/<\/div>\s*<div>/gi, '</div><div>');
-    html = html.replace(/<\/p>\s*<p>/gi, '</p><p>');
-    html = html.replace(/<ul[^>]*>\s*<li/gi, '<ul><li');
-    html = html.replace(/<\/li>\s*<li>/gi, '</li><li>');
-    html = html.replace(/<\/li>\s*<\/ul>/gi, '</li></ul>');
-    html = html.replace(/\n/g, '<br>');
-
-    const temp = document.createElement('div');
-    temp.innerHTML = html;
-
-    // Higieniza atributos de estilo que poluem a colagem no email
-    const all = temp.querySelectorAll('*');
-    all.forEach((el) => {
-      el.removeAttribute('class');
-      el.removeAttribute('id');
-      if (el.hasAttribute('style')) {
-        el.style.backgroundColor = '';
-        el.style.background = '';
-        el.style.fontFamily = '';
-        el.style.fontSize = '';
-        el.style.lineHeight = '';
-        el.style.color = '';
-        if (!el.getAttribute('style') || el.getAttribute('style').trim() === '') {
-          el.removeAttribute('style');
-        }
-      }
-    });
-
-    // Remove qualquer elemento vazio ou espaço em branco que cause recuo na primeira linha
-    while (temp.firstChild) {
-      const fc = temp.firstChild;
-      if (fc.nodeType === Node.TEXT_NODE) {
-        fc.nodeValue = fc.nodeValue.replace(/^[\s\u00A0]+/, '');
-        if (fc.nodeValue.length === 0) {
-          temp.removeChild(fc);
-          continue;
-        }
-        break;
-      } else if (fc.nodeType === Node.ELEMENT_NODE) {
-        if (fc.tagName === 'BR') {
-          temp.removeChild(fc);
-          continue;
-        }
-        const textInside = fc.textContent || '';
-        if (!textInside.trim() && !fc.querySelector('img')) {
-          temp.removeChild(fc);
-          continue;
-        }
-        // Limpa o espaço inicial dentro do primeiro nó de texto do elemento
-        const walker = document.createTreeWalker(fc, NodeFilter.SHOW_TEXT, null, false);
-        const firstText = walker.nextNode();
-        if (firstText) {
-          firstText.nodeValue = firstText.nodeValue.replace(/^[\s\u00A0]+/, '');
-        }
-        break;
-      } else {
-        temp.removeChild(fc);
-      }
-    }
-
-    let cleanHtml = temp.innerHTML.trim();
-    cleanHtml = cleanHtml.replace(/^((?:<[^>]+>)*)[\s\u00A0&nbsp;]+/i, '$1');
-
-    let plainText = temp.innerText || temp.textContent || '';
-    plainText = plainText.replace(/^[\s\u00A0]+/, '');
+    const { html: cleanHtml, text: plainText } = prepararParaCopia(htmlStr);
 
     let copiou = false;
     if (navigator.clipboard && window.ClipboardItem) {
@@ -482,21 +569,6 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
     }
   };
 
-  const getCor = (catNome) => {
-    const nome = normalizar(catNome);
-    if (nome.includes('relacionamento')) return { bg: '#F5EEF8', border: '#D7BDE2' };
-    if (nome.includes('mascara')) return { bg: '#F2F4F4', border: '#D5D8DC' };
-    if (nome.includes('entrega') || nome.includes('rastreio')) return { bg: '#E8F8F5', border: '#A3E4D7' };
-    if (nome.includes('atraso') || nome.includes('extravio')) return { bg: '#FEF9E7', border: '#F9E79F' };
-    if (nome.includes('vendedor') || nome.includes('standby')) return { bg: '#FDF2E9', border: '#F5CBA7' };
-    if (nome.includes('troca') || nome.includes('devolu')) return { bg: '#F9EBEA', border: '#F2D7D5' };
-    if (nome.includes('cancelamento') || nome.includes('reembolso')) return { bg: '#FDEDEC', border: '#F5B7B1' };
-    if (nome.includes('financeiro') || nome.includes('pagamento')) return { bg: '#EAF2F8', border: '#A9CCE3' };
-    if (nome.includes('cadastro') || nome.includes('login')) return { bg: '#EAFAF1', border: '#A9DFBF' };
-    if (nome.includes('plataforma') || nome.includes('carrinho')) return { bg: '#F4ECF7', border: '#D2B4DE' };
-    return { bg: '#FFFFFF', border: '#CBD5E1' };
-  };
-
   // 1. CARREGAMENTO COM ORDENAÇÃO DINÂMICA
   const buscarCategorias = async () => {
     try {
@@ -511,9 +583,10 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
           .from('categorias_colinhas')
           .select('*')
           .order('id', { ascending: true });
-        if (fallbackData) setCategorias(fallbackData);
+        if (fallbackData) { setCategorias(fallbackData); gravarCache(chaveCache, 'categorias', fallbackData); }
       } else if (data) {
         setCategorias(data);
+        gravarCache(chaveCache, 'categorias', data);
       }
     } catch (err) {
       console.error('Erro ao buscar categorias:', err);
@@ -545,6 +618,7 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
           buscaIndex: normalizar(`${item.titulo} ${stripHtml(item.conteudo)} ${item.atalho || ''}`)
         }));
         setColinhas(processadas);
+        gravarCache(chaveCache, 'colinhas', processadas);
       }
     } catch (err) {
       console.error('Erro ao buscar colinhas:', err);
@@ -556,13 +630,21 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
     buscarCategorias();
     buscarColinhas();
 
+    // Várias alterações seguidas (ou o nosso próprio salvar) viram UMA só recarga
+    let tCol = null;
+    let tCat = null;
+    const agendarColinhas = () => { clearTimeout(tCol); tCol = setTimeout(buscarColinhas, 250); };
+    const agendarCategorias = () => { clearTimeout(tCat); tCat = setTimeout(buscarCategorias, 250); };
+
     const canal = supabase
       .channel('colinhas_realtime_board')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'colinhas' }, () => buscarColinhas())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'categorias_colinhas' }, () => buscarCategorias())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'colinhas' }, agendarColinhas)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'categorias_colinhas' }, agendarCategorias)
       .subscribe();
 
     return () => {
+      clearTimeout(tCol);
+      clearTimeout(tCat);
       supabase.removeChannel(canal);
     };
   }, []);
@@ -913,8 +995,9 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
   };
 
   // ORDENAÇÃO E FILTRAGEM (Pesquisa Global Independente de Categoria)
+  const buscaDiferida = useDeferredValue(termoBusca);
   const colinhasFiltradas = useMemo(() => {
-    const termo = normalizar(termoBusca);
+    const termo = normalizar(buscaDiferida);
     const filtroNomeNorm = normalizar(filtroAtivo.nome);
 
     return colinhas
@@ -952,9 +1035,43 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
           const dataB = new Date(b.atualizadoEm || 0).getTime();
           if (dataB !== dataA) return dataB - dataA;
         }
-        return a.t.localeCompare(b.t);
+        return colador.compare(a.t, b.t);
       });
-  }, [colinhas, filtroAtivo, termoBusca]);
+  }, [colinhas, filtroAtivo, buscaDiferida]);
+
+  // Renderização em lotes: só desenha os primeiros cards e libera mais ao rolar
+  const chaveLista = `${filtroAtivo.id}|${buscaDiferida}`;
+  const [lim, setLim] = useState({ chave: '', n: LOTE_CARDS });
+  const limite = lim.chave === chaveLista ? lim.n : LOTE_CARDS;
+  const temMais = colinhasFiltradas.length > limite;
+  const visiveis = useMemo(() => colinhasFiltradas.slice(0, limite), [colinhasFiltradas, limite]);
+  const sentinelaRef = useRef(null);
+
+  useEffect(() => {
+    if (!temMais || !sentinelaRef.current) return undefined;
+    if (typeof IntersectionObserver === 'undefined') {
+      setLim({ chave: chaveLista, n: colinhasFiltradas.length });
+      return undefined;
+    }
+    const obs = new IntersectionObserver(
+      (entradas) => {
+        if (entradas[0].isIntersecting) setLim({ chave: chaveLista, n: limite + LOTE_CARDS });
+      },
+      { rootMargin: '700px 0px' }
+    );
+    obs.observe(sentinelaRef.current);
+    return () => obs.disconnect();
+  }, [temMais, limite, chaveLista, colinhasFiltradas.length]);
+
+  // Funções estáveis para os cards (evita re-renderizar todos a cada tecla/toast)
+  const acoesRef = useRef({});
+  acoesRef.current = { fixar: alternarFixarColinha, editar: abrirModalEditar };
+  const onFixarEstavel = useCallback((e, c) => acoesRef.current.fixar(e, c), []);
+  const onEditarEstavel = useCallback((e, c) => acoesRef.current.editar(e, c), []);
+  const onExcluirEstavel = useCallback((e, item) => {
+    e.stopPropagation();
+    setColinhaParaExcluir(item);
+  }, []);
 
   return (
     <div style={{ maxWidth: '1440px', margin: '0 auto', padding: '36px 20px 80px 20px' }}>
@@ -963,7 +1080,9 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
       <style>{`
         .card-colinha-otimizado {
           transition: transform 0.16s ease, box-shadow 0.16s ease;
-          will-change: transform;
+          /* cards fora da tela não são desenhados (grande ganho em notebooks antigos) */
+          content-visibility: auto;
+          contain-intrinsic-size: auto 300px;
           overflow: hidden !important;
           word-break: break-word !important;
           overflow-wrap: anywhere !important;
@@ -1716,23 +1835,32 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
                 <p>Nenhuma colinha encontrada para esta seleção.</p>
               </div>
             ) : isMounted ? (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))', gap: '20px', alignItems: 'start' }}>
-                {colinhasFiltradas.map((c) => (
-                  <CardColinha
-                    key={c.id}
-                    colinha={c}
-                    cores={getCor(c.c)}
-                    isSupervisor={isSupervisor}
-                    onVerNota={setModalNota}
-                    onAlternarFixar={alternarFixarColinha}
-                    onEditar={abrirModalEditar}
-                    onExcluir={(e, item) => {
-                      e.stopPropagation();
-                      setColinhaParaExcluir(item);
-                    }}
-                  />
-                ))}
-              </div>
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))', gap: '20px', alignItems: 'start' }}>
+                  {visiveis.map((c) => (
+                    <CardColinha
+                      key={c.id}
+                      colinha={c}
+                      cores={getCor(c.c)}
+                      isSupervisor={isSupervisor}
+                      onVerNota={setModalNota}
+                      onAlternarFixar={onFixarEstavel}
+                      onEditar={onEditarEstavel}
+                      onExcluir={onExcluirEstavel}
+                    />
+                  ))}
+                </div>
+                {temMais && (
+                  <div ref={sentinelaRef} style={{ textAlign: 'center', padding: '28px 0 8px 0' }}>
+                    <button
+                      onClick={() => setLim({ chave: chaveLista, n: limite + LOTE_CARDS })}
+                      style={{ padding: '8px 20px', borderRadius: '9999px', border: '1px solid var(--border-card, #CBD5E1)', background: 'var(--bg-card, #FFF)', color: 'var(--texto-destaque-turquesa, #006968)', fontWeight: '700', cursor: 'pointer' }}
+                    >
+                      Mostrar mais ({colinhasFiltradas.length - limite} restantes)
+                    </button>
+                  </div>
+                )}
+              </>
             ) : null}
           </div>
         </main>
@@ -1745,7 +1873,6 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
             position: 'fixed',
             inset: 0,
             backgroundColor: 'rgba(0, 20, 20, 0.75)',
-            backdropFilter: 'blur(3px)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -1822,6 +1949,18 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
             {/* CONTEÚDO RICH TEXT DA NOTA */}
             <div
               ref={modalTextRef}
+              onCopy={(e) => {
+                // Seleção manual (mouse / Ctrl+A) também sai sem espaço no início
+                const sel = window.getSelection();
+                if (!sel || sel.isCollapsed || !e.clipboardData) return;
+                const box = document.createElement('div');
+                for (let i = 0; i < sel.rangeCount; i++) box.appendChild(sel.getRangeAt(i).cloneContents());
+                const { html, text } = prepararParaCopia(box.innerHTML);
+                if (!text) return;
+                e.clipboardData.setData('text/html', html);
+                e.clipboardData.setData('text/plain', text);
+                e.preventDefault();
+              }}
               className="modal-nota-texto"
               dangerouslySetInnerHTML={{ __html: modalNota.txtCompilado }}
               style={{
@@ -1919,7 +2058,6 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
             position: 'fixed',
             inset: 0,
             backgroundColor: 'rgba(0, 20, 20, 0.7)',
-            backdropFilter: 'blur(3px)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -2201,7 +2339,6 @@ export default function ColinhasBoard({ isSupervisor, usuarioLogado }) {
           position: 'fixed',
           inset: 0,
           backgroundColor: 'rgba(0, 20, 20, 0.75)',
-          backdropFilter: 'blur(3px)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
